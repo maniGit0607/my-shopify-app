@@ -120,6 +120,15 @@ export default function Home() {
             </Card>
           </div>
         </Layout>
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <div style={{ minHeight: '300px' }}>
+                {/* Blank card content - visible for all tabs */}
+              </div>
+            </Card>
+          </Layout.Section>
+        </Layout>
     </Page>
     );
   }
