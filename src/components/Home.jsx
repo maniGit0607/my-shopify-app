@@ -89,46 +89,46 @@ export default function Home() {
     return (
       <Page fullWidth>
         <TitleBar title="Visualize your business" />
-      <Layout>
-        <div style={{ flex: '1' }}>
-            <Card sectioned>
-              {/* Tabs for Sync History */}
-              <Tabs
-                tabs={tabs}
-                selected={selectedTab}
-                onSelect={handleTabChange}
-              >
-                <Card title={tabs[selectedTab].content}>
-                  {tabs[selectedTab].render}
-                </Card>
-              </Tabs>
-            </Card>
-          </div>
-          <div style={{ flex: '0 0 20%' }}>
-          <Card>
+        <Layout>
+          <Layout.Section>
+            <BlockStack gap="400">
+              <Card sectioned>
+                {/* Tabs for Reports */}
+                <Tabs
+                  tabs={tabs}
+                  selected={selectedTab}
+                  onSelect={handleTabChange}
+                >
+                  <Card title={tabs[selectedTab].content}>
+                    {tabs[selectedTab].render}
+                  </Card>
+                </Tabs>
+              </Card>
+              
+              <Card>
+                <div style={{ minHeight: '400px', padding: '16px' }}>
+                  {/* Graph and tables will be displayed here */}
+                </div>
+              </Card>
+            </BlockStack>
+          </Layout.Section>
+          
+          <Layout.Section variant="oneThird">
+            <Card>
               <BlockStack gap="200">
                 <Text as="h2" variant="headingMd">
-                  Saved Report Context
+                  Saved Reports
                 </Text>
                 <BlockStack gap="200">
-                    <Link target="blank" removeUnderline>Total Sales August 2024</Link>
-                    <Link target="blank" removeUnderline>Total Orders last 2 years</Link>
-                    <Link target="blank" removeUnderline>Last 3 monthly sales</Link>
-                    <Link target="blank" removeUnderline>Products sold by variants</Link>
+                  <Link target="blank" removeUnderline>Total Sales August 2024</Link>
+                  <Link target="blank" removeUnderline>Total Orders last 2 years</Link>
+                  <Link target="blank" removeUnderline>Last 3 monthly sales</Link>
+                  <Link target="blank" removeUnderline>Products sold by variants</Link>
                 </BlockStack>
               </BlockStack>
             </Card>
-          </div>
-        </Layout>
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <div style={{ minHeight: '300px' }}>
-                {/* Blank card content - visible for all tabs */}
-              </div>
-            </Card>
           </Layout.Section>
         </Layout>
-    </Page>
+      </Page>
     );
   }
