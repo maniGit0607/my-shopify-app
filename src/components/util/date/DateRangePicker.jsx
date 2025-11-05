@@ -8,15 +8,15 @@ import {
   TextField,
 } from '@shopify/polaris';
 
-export default function DateRangePicker() {
+export default function DateRangePicker({ onChange }) {
   const today = new Date();
   const [popoverActive, setPopoverActive] = useState(false);
   const [selectedDates, setSelectedDates] = useState({
-    start: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6), // Default: Last 7 days
+    start: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 364), // Default: Last 1 year
     end: today,
   });
 
-  const [relativeOption, setRelativeOption] = useState('last7Days'); // Default relative option
+  const [relativeOption, setRelativeOption] = useState('oneYearToDate'); // Default relative option
 
   const [month, setMonth] = useState(today.getMonth());
   const [year, setYear] = useState(today.getFullYear());
@@ -30,10 +30,16 @@ export default function DateRangePicker() {
     setRelativeOption(value);
     const newDates = calculateRelativeDates(value);
     setSelectedDates(newDates);
+    if (onChange) {
+      onChange(newDates);
+    }
   };
 
   const handleDateChange = (value) => {
     setSelectedDates(value);
+    if (onChange) {
+      onChange(value);
+    }
   };
 
   const calculateRelativeDates = (option) => {

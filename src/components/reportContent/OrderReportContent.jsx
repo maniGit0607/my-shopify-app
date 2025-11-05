@@ -3,10 +3,14 @@ import { Select, TextField, InlineStack, BlockStack } from '@shopify/polaris';
 import DateRangePicker from '../util/date/DateRangePicker';
 
 
-export default function OrdersReportContent(){
-
+export default function OrdersReportContent({ onFilterChange }){
+    const today = new Date();
     const [selectedReport, setSelectedReport] = useState('ordersOverTime');
     const [interval, setInterval] = useState('daily');
+    const [dateRange, setDateRange] = useState({
+      start: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 364),
+      end: today,
+    });
 
     const reportOptions = [
         { label: 'Orders Over Time', value: 'ordersOverTime' },
@@ -20,6 +24,23 @@ export default function OrdersReportContent(){
       // Handler for changing the selected report
       const handleReportChange = (value) => {
         setSelectedReport(value);
+        if (onFilterChange) {
+          onFilterChange({ reportType: value, interval, dateRange });
+        }
+      };
+
+      const handleIntervalChange = (value) => {
+        setInterval(value);
+        if (onFilterChange) {
+          onFilterChange({ reportType: selectedReport, interval: value, dateRange });
+        }
+      };
+
+      const handleDateRangeChange = (newDateRange) => {
+        setDateRange(newDateRange);
+        if (onFilterChange) {
+          onFilterChange({ reportType: selectedReport, interval, dateRange: newDateRange });
+        }
       };
 
       // Render content based on selected report type
@@ -28,7 +49,7 @@ export default function OrdersReportContent(){
       case 'ordersOverTime':
         return (
           <InlineStack align='space-between' blockAlign='end'>
-            <DateRangePicker />
+            <DateRangePicker onChange={handleDateRangeChange} />
             <Select
               label="Interval"
               labelInline
@@ -38,38 +59,38 @@ export default function OrdersReportContent(){
                 { label: 'Monthly', value: 'monthly' },
               ]}
               value={interval}
-              onChange={(value) => setInterval(value)}
+              onChange={handleIntervalChange}
             />
           </InlineStack>
         );
       case 'ordersByDiscount':
         return (
             <InlineStack align='space-between' blockAlign='end'>
-              <DateRangePicker />
+              <DateRangePicker onChange={handleDateRangeChange} />
             </InlineStack>
           );
       case 'ordersByTrafficSource':
         return (
             <InlineStack align='space-between' blockAlign='end'>
-              <DateRangePicker />
+              <DateRangePicker onChange={handleDateRangeChange} />
             </InlineStack>
           );
       case 'ordersByChannel':
         return (
             <InlineStack align='space-between' blockAlign='end'>
-              <DateRangePicker />
+              <DateRangePicker onChange={handleDateRangeChange} />
             </InlineStack>
           );
       case 'ordersByPaymentMethod':
         return (
             <InlineStack align='space-between' blockAlign='end'>
-              <DateRangePicker />
+              <DateRangePicker onChange={handleDateRangeChange} />
             </InlineStack>
           );
         case 'ordersByStatus':
         return (
             <InlineStack align='space-between' blockAlign='end'>
-                <DateRangePicker />
+                <DateRangePicker onChange={handleDateRangeChange} />
             </InlineStack>
             );
       default:

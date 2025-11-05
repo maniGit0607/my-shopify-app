@@ -18,6 +18,7 @@ import OrdersReportContent from "./reportContent/OrderReportContent";
 import ProductReportContent from "./reportContent/ProductReportContent";
 import CustomerReportContent from "./reportContent/CustomerReportContent";
 import DisputeReportContent from "./reportContent/DisputeReportContent";
+import OrdersPieChart from "./charts/OrdersPieChart";
 
 export default function Home() {
     const shopify = useAppBridge();
@@ -25,6 +26,21 @@ export default function Home() {
     // Tab handling
     const [selectedTab, setSelectedTab] = useState(0);
     const handleTabChange = useCallback((selectedTabIndex) => setSelectedTab(selectedTabIndex), []);
+
+    // Order filters state
+    const today = new Date();
+    const [orderFilters, setOrderFilters] = useState({
+      reportType: 'ordersOverTime',
+      interval: 'daily',
+      dateRange: {
+        start: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 364),
+        end: today,
+      },
+    });
+
+    const handleOrderFilterChange = useCallback((filters) => {
+      setOrderFilters(filters);
+    }, []);
   
     /*useEffect(() => {
       const graphCall = async () => {
@@ -52,7 +68,7 @@ export default function Home() {
       {
         id: 'Orders',
         content: 'Orders Reports',
-        render: <OrdersReportContent />,
+        render: <OrdersReportContent onFilterChange={handleOrderFilterChange} />,
         accessibilityLabel: 'Orders Reports',
         panelID: 'orders-report-content',
       },
@@ -107,7 +123,14 @@ export default function Home() {
               
               <Card>
                 <div style={{ minHeight: '400px', padding: '16px' }}>
-                  {/* Graph and tables will be displayed here */}
+                  {selectedTab === 0 && <OrdersPieChart filters={orderFilters} />}
+                  {selectedTab !== 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      <Text variant="headingMd" as="h3" tone="subdued">
+                        Chart visualization will appear here
+                      </Text>
+                    </div>
+                  )}
                 </div>
               </Card>
             </BlockStack>
