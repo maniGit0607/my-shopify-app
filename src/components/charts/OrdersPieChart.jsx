@@ -25,7 +25,7 @@ export default function OrdersPieChart({ filters }) {
       const endDate = dateRange?.end ? new Date(dateRange.end).toISOString() : new Date().toISOString();
 
       const query = `
-        query getOrders($startDate: DateTime!, $endDate: DateTime!) {
+        query {
           orders(first: 250, query: "created_at:>='${startDate.split('T')[0]}' AND created_at:<='${endDate.split('T')[0]}'") {
             edges {
               node {
