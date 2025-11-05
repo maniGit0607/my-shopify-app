@@ -1,0 +1,8 @@
+.inline-radio-buttons .Polaris-ChoiceList__Choices {
+    display: flex;
+    gap: 20px;
+  }
+  
+  .inline-radio-buttons .Polaris-Choice {
+    margin-bottom: 0;
+  }

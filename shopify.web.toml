@@ -1,0 +1,6 @@
+name = "my-shop-app"
+roles = ["frontend", "backend"]
+webhooks_path = "/webhooks/app/uninstalled"
+
+[commands]
+dev = "npm run dev"
