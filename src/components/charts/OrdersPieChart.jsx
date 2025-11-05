@@ -12,7 +12,10 @@ export default function OrdersPieChart({ filters }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchOrderData();
+    if (filters && filters.dateRange) {
+      fetchOrderData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const fetchOrderData = async () => {
@@ -21,8 +24,16 @@ export default function OrdersPieChart({ filters }) {
     
     try {
       const { dateRange } = filters;
-      const startDate = dateRange?.start ? new Date(dateRange.start).toISOString() : new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString();
-      const endDate = dateRange?.end ? new Date(dateRange.end).toISOString() : new Date().toISOString();
+      
+      // Ensure we have valid date range
+      if (!dateRange || !dateRange.start || !dateRange.end) {
+        setError('Invalid date range');
+        setLoading(false);
+        return;
+      }
+      
+      const startDate = new Date(dateRange.start).toISOString();
+      const endDate = new Date(dateRange.end).toISOString();
 
       const query = `
         query {

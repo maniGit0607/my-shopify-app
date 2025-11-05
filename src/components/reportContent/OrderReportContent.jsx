@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Select, TextField, InlineStack, BlockStack } from '@shopify/polaris';
 import DateRangePicker from '../util/date/DateRangePicker';
 
@@ -11,6 +11,13 @@ export default function OrdersReportContent({ onFilterChange }){
       start: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 364),
       end: today,
     });
+
+    // Send initial filter values to parent on mount
+    useEffect(() => {
+      if (onFilterChange) {
+        onFilterChange({ reportType: selectedReport, interval, dateRange });
+      }
+    }, []);
 
     const reportOptions = [
         { label: 'Orders Over Time', value: 'ordersOverTime' },

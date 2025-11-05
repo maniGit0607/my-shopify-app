@@ -113,13 +113,19 @@ export default function DateRangePicker({ onChange }) {
     { label: '3 year to date', value: 'threeYearToDate' },
   ];
 
+  const formatDateRange = () => {
+    const startStr = selectedDates.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const endStr = selectedDates.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startStr} - ${endStr}`;
+  };
+
   return (
     <div>
       <Popover
         active={popoverActive}
         activator={
           <Button onClick={togglePopoverActive} disclosure>
-            Select Date Range
+            {formatDateRange()}
           </Button>
         }
         onClose={togglePopoverActive}
