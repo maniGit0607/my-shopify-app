@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, Text, BlockStack, Spinner } from '@shopify/polaris';
-import { useAuthenticatedFetch } from '@shopify/app-bridge-react';
 
 const COLORS = ['#008060', '#5C6AC4', '#006FBB', '#47C1BF', '#FFC96B', '#DC5E63', '#7B6BD6'];
 
 export default function OrdersPieChart({ filters }) {
-  const fetch = useAuthenticatedFetch();
   const [orderData, setOrderData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -57,7 +55,7 @@ export default function OrdersPieChart({ filters }) {
         }
       `;
 
-      const response = await fetch('/admin/api/2024-10/graphql.json', {
+      const response = await fetch("shopify:admin/api/graphql.json", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
