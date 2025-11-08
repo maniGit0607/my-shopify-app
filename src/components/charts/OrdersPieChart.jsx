@@ -1,22 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, Text, BlockStack, Spinner } from '@shopify/polaris';
+import { useShopifyFetch } from '../../hooks/useShopifyFetch';
 
 const COLORS = ['#008060', '#5C6AC4', '#006FBB', '#47C1BF', '#FFC96B', '#DC5E63', '#7B6BD6'];
 
 export default function OrdersPieChart({ filters }) {
+  const shopifyFetch = useShopifyFetch();
   const [orderData, setOrderData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (filters && filters.dateRange) {
-      fetchOrderData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
-
-  const fetchOrderData = async () => {
+  const fetchOrderData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -55,11 +50,8 @@ export default function OrdersPieChart({ filters }) {
         }
       `;
 
-      const response = await fetch("shopify:admin/api/graphql.json", {
+      const response = await shopifyFetch("shopify:admin/api/graphql.json", {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ query }),
       });
 
@@ -80,7 +72,13 @@ export default function OrdersPieChart({ filters }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, shopifyFetch]);
+
+  useEffect(() => {
+    if (filters && filters.dateRange) {
+      fetchOrderData();
+    }
+  }, [filters, fetchOrderData]);
 
   const processOrdersByStatus = (orders) => {
     const statusCounts = {};
