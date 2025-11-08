@@ -57,8 +57,11 @@ export default function OrdersPieChart({ filters }) {
         }
       `;
 
-      const response = await fetch('shopify:admin/api/graphql.json', {
+      const response = await shopify.fetch('/admin/api/2024-10/graphql.json', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ query }),
       });
 
