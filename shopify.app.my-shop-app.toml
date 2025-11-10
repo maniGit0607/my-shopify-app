@@ -17,9 +17,8 @@ scopes = "write_products,read_orders"
 
 [auth]
 redirect_urls = [
-  "https://5d6c-2406-7400-c8-90b6-f1cf-6ee3-6175-c6bc.ngrok-free.app/auth/callback",
-  "https://5d6c-2406-7400-c8-90b6-f1cf-6ee3-6175-c6bc.ngrok-free.app/auth/shopify/callback",
-  "https://5d6c-2406-7400-c8-90b6-f1cf-6ee3-6175-c6bc.ngrok-free.app/api/auth/callback"
+  "http://localhost:8787/auth/callback",
+  "https://your-worker-url.workers.dev/auth/callback"
 ]
 
 [webhooks]
