@@ -1,13 +1,11 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "3c333541b1807a90350f6d829e13cd9b"
+client_id = "adf09a15971e32d6d1af341d9c0a7d14"
 name = "my-shop-app"
-handle = "my-shop-app-41"
-application_url = "https://5d6c-2406-7400-c8-90b6-f1cf-6ee3-6175-c6bc.ngrok-free.app"
+application_url = "https://baghdad-moderator-man-sig.trycloudflare.com"
 embedded = true
 
 [build]
-include_config_on_deploy = true
 dev_store_url = "onlinestorehelper.myshopify.com"
 automatically_update_urls_on_dev = true
 

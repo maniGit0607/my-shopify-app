@@ -1,29 +1,30 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "3c333541b1807a90350f6d829e13cd9b"
+client_id = "adf09a15971e32d6d1af341d9c0a7d14"
 name = "my-shop-app"
-handle = "my-shop-app-41"
-application_url = "https://26b5-49-204-141-0.ngrok-free.app"
+application_url = "https://example.com"
 embedded = true
 
 [build]
-include_config_on_deploy = true
-dev_store_url = "onlinestorehelper.myshopify.com"
 automatically_update_urls_on_dev = true
+dev_store_url = "onlinestorehelper.myshopify.com"
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-10"
+
+[access.admin]
+direct_api_mode = "online"
+embedded_app_direct_api_access = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,read_orders"
+scopes = ""
+optional_scopes = [ ]
+use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [
-  "https://26b5-49-204-141-0.ngrok-free.app/auth/callback",
-  "https://26b5-49-204-141-0.ngrok-free.app/auth/shopify/callback",
-  "https://26b5-49-204-141-0.ngrok-free.app/api/auth/callback"
-]
-
-[webhooks]
-api_version = "2024-10"
+redirect_urls = [ ]
 
 [pos]
 embedded = false

@@ -19,9 +19,6 @@ function App() {
       <AppBridgeProvider config={config}>
         <AppProvider i18n={en}>
           <RouteTeller />
-          <NavMenu>
-            <a href="" rel="home">Home</a>
-          </NavMenu>
         </AppProvider>
       </AppBridgeProvider>
     </BrowserRouter>
