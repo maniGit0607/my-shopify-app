@@ -59,13 +59,14 @@ auth.get('/callback', async (c) => {
 
   // Validate HMAC
   const params: Record<string, string> = {};
-  c.req.queries().forEach((value, key) => {
+  const queries = c.req.queries();
+  for (const [key, value] of Object.entries(queries)) {
     if (Array.isArray(value)) {
       params[key] = value[0];
     } else {
-      params[key] = value;
+      params[key] = value as string;
     }
-  });
+  }
 
   const isValidHmac = await oauth.validateHmac(params);
   if (!isValidHmac) {
