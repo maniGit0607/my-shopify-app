@@ -12,7 +12,7 @@ import {
   Text,
   LegacyCard
 } from "@shopify/polaris";
-import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { TitleBar } from "@shopify/app-bridge-react";
 import SalesReportContent from "./reportContent/SalesReportContent";
 import OrdersReportContent from "./reportContent/OrderReportContent";
 import ProductReportContent from "./reportContent/ProductReportContent";
@@ -21,7 +21,7 @@ import DisputeReportContent from "./reportContent/DisputeReportContent";
 import OrdersPieChart from "./charts/OrdersPieChart";
 
 export default function Home() {
-    const shopify = useAppBridge();
+    // With App Bridge v4 CDN, we don't need useAppBridge hook anymore
 
     // Tab handling
     const [selectedTab, setSelectedTab] = useState(0);
