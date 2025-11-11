@@ -30,3 +30,4 @@ export interface ShopifyOAuthResponse {
   scope: string;
 }
 
+

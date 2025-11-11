@@ -1,84 +1,46 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
+import { useQuery, gql } from '@apollo/client';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { Card, Text, BlockStack, Spinner } from '@shopify/polaris';
-import { useShopifyFetch } from '../../hooks/useShopifyFetch';
+import { Text, BlockStack, Spinner } from '@shopify/polaris';
 
 const COLORS = ['#008060', '#5C6AC4', '#006FBB', '#47C1BF', '#FFC96B', '#DC5E63', '#7B6BD6'];
 
-export default function OrdersPieChart({ filters }) {
-  const shopifyFetch = useShopifyFetch();
-  const [orderData, setOrderData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const fetchOrderData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const { dateRange } = filters;
-      
-      // Ensure we have valid date range
-      if (!dateRange || !dateRange.start || !dateRange.end) {
-        setError('Invalid date range');
-        setLoading(false);
-        return;
-      }
-      
-      const startDate = new Date(dateRange.start).toISOString();
-      const endDate = new Date(dateRange.end).toISOString();
-
-      const query = `
-        query {
-          orders(first: 250, query: "created_at:>='${startDate.split('T')[0]}' AND created_at:<='${endDate.split('T')[0]}'") {
-            edges {
-              node {
-                id
-                name
-                createdAt
-                displayFinancialStatus
-                displayFulfillmentStatus
-                totalPriceSet {
-                  shopMoney {
-                    amount
-                    currencyCode
-                  }
-                }
-              }
+// GraphQL query for fetching orders
+const GET_ORDERS = gql`
+  query GetOrders($query: String!) {
+    orders(first: 250, query: $query) {
+      edges {
+        node {
+          id
+          name
+          createdAt
+          displayFinancialStatus
+          displayFulfillmentStatus
+          totalPriceSet {
+            shopMoney {
+              amount
+              currencyCode
             }
           }
         }
-      `;
-
-      const response = await shopifyFetch("shopify:admin/api/graphql.json", {
-        method: 'POST',
-        body: JSON.stringify({ query }),
-      });
-
-      const data = await response.json();
-      
-      if (data.errors) {
-        throw new Error(data.errors[0].message);
       }
-
-      // Process data based on report type
-      const orders = data.data?.orders?.edges || [];
-      const processedData = processOrdersByStatus(orders);
-      setOrderData(processedData);
-      
-    } catch (err) {
-      setError(err.message || 'Failed to fetch order data');
-      console.error('Error fetching orders:', err);
-    } finally {
-      setLoading(false);
     }
-  }, [filters, shopifyFetch]);
+  }
+`;
 
-  useEffect(() => {
-    if (filters && filters.dateRange) {
-      fetchOrderData();
-    }
-  }, [filters, fetchOrderData]);
+export default function OrdersPieChart({ filters }) {
+  const { dateRange } = filters;
+  
+  // Prepare query string for Shopify
+  const startDate = dateRange?.start ? new Date(dateRange.start).toISOString().split('T')[0] : '';
+  const endDate = dateRange?.end ? new Date(dateRange.end).toISOString().split('T')[0] : '';
+  const queryString = `created_at:>='${startDate}' AND created_at:<='${endDate}'`;
+
+  // Use Apollo query with automatic caching and loading states
+  const { loading, error, data } = useQuery(GET_ORDERS, {
+    variables: { query: queryString },
+    skip: !startDate || !endDate, // Skip query if dates not available
+  });
 
   const processOrdersByStatus = (orders) => {
     const statusCounts = {};
@@ -94,6 +56,40 @@ export default function OrdersPieChart({ filters }) {
     }));
   };
 
+  // Handle loading state
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <Spinner size="large" />
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <Text variant="headingMd" as="h3" tone="critical">Error loading data</Text>
+        <Text>{error.message}</Text>
+      </div>
+    );
+  }
+
+  // Process orders by status
+  const orders = data?.orders?.edges || [];
+  const orderData = processOrdersByStatus(orders);
+
+  // Handle empty data
+  if (orderData.length === 0) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <Text variant="headingMd" as="h3">No order data available</Text>
+        <Text>Try adjusting your date range or filters</Text>
+      </div>
+    );
+  }
+
+  // Render custom label with percentage
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -113,32 +109,6 @@ export default function OrdersPieChart({ filters }) {
       </text>
     );
   };
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <Spinner size="large" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <Text variant="headingMd" as="h3" tone="critical">Error loading data</Text>
-        <Text>{error}</Text>
-      </div>
-    );
-  }
-
-  if (orderData.length === 0) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <Text variant="headingMd" as="h3">No order data available</Text>
-        <Text>Try adjusting your date range or filters</Text>
-      </div>
-    );
-  }
 
   return (
     <BlockStack gap="300">
