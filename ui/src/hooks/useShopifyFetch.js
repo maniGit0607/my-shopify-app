@@ -10,8 +10,15 @@ export function useShopifyFetch() {
 
   const shopifyFetch = useCallback(async (url, options = {}) => {
     try {
-      // Get session token from App Bridge
-      const token = await getSessionToken(app);
+      // Get session token from App Bridge with timeout
+      console.log('Getting session token...');
+      const tokenPromise = getSessionToken(app);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session token timeout - app not embedded?')), 5000)
+      );
+      
+      const token = await Promise.race([tokenPromise, timeoutPromise]);
+      console.log('Session token obtained');
       
       // Convert shopify: protocol to backend API endpoint
       let apiUrl = url;
@@ -21,6 +28,8 @@ export function useShopifyFetch() {
         // For other Shopify API calls, also proxy through backend
         apiUrl = url.replace('shopify:', `${BACKEND_URL}/api`);
       }
+      
+      console.log('Calling backend:', apiUrl);
       
       // Prepare headers with session token
       const headers = {
@@ -35,6 +44,7 @@ export function useShopifyFetch() {
         headers,
       });
 
+      console.log('Backend response:', response.status);
       return response;
     } catch (error) {
       console.error('Backend fetch error:', error);
