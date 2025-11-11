@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, Text, BlockStack, Spinner } from '@shopify/polaris';
-import { useShopifyFetch } from '../../hooks/useShopifyFetch';
+import { useGraphQLFetch } from '../../hooks/useAuthenticatedFetch';
 
 const COLORS = ['#008060', '#5C6AC4', '#006FBB', '#47C1BF', '#FFC96B', '#DC5E63', '#7B6BD6'];
 
 export default function OrdersPieChart({ filters }) {
-  const shopifyFetch = useShopifyFetch();
+  const graphqlFetch = useGraphQLFetch();
   const [orderData, setOrderData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -48,18 +48,15 @@ export default function OrdersPieChart({ filters }) {
             }
           }
         }
-          `;
+      `;
 
-      const response = await shopifyFetch("shopify:admin/api/graphql.json", {
-        method: 'POST',
-        body: JSON.stringify({ query }),
-      });
-
-      const data = await response.json();
+      // Use new token exchange flow - backend handles authentication
+      const data = await graphqlFetch(query);
       
       if (data.errors) {
         throw new Error(data.errors[0].message);
       }
+      
       // Process data based on report type
       const orders = data.data?.orders?.edges || [];
       const processedData = processOrdersByStatus(orders);
@@ -71,7 +68,7 @@ export default function OrdersPieChart({ filters }) {
     } finally {
       setLoading(false);
     }
-}, [filters, shopifyFetch]);
+  }, [filters, graphqlFetch]);
 
   useEffect(() => {
     if (filters && filters.dateRange) {

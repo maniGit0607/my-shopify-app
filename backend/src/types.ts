@@ -3,6 +3,7 @@ export interface Env {
   SHOPIFY_API_SECRET: string;
   SHOPIFY_SCOPES: string;
   APP_URL: string;
+  FRONTEND_URL: string;
   SHOP_TOKENS: KVNamespace;
 }
 
