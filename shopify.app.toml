@@ -2,29 +2,28 @@
 
 client_id = "adf09a15971e32d6d1af341d9c0a7d14"
 name = "my-shop-app"
-application_url = "https://example.com"
+application_url = "https://1550f0a94670.ngrok-free.app"
 embedded = true
 
 [build]
+dev_store_url = "test-store-1100000000000000000000000000000002119.myshopify.com"
 automatically_update_urls_on_dev = true
-dev_store_url = "onlinestorehelper.myshopify.com"
-include_config_on_deploy = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products,read_orders"
+
+[auth]
+redirect_urls = [
+  "https://foot-proteins-justin-column.trycloudflare.com/auth/callback"
+]
 
 [webhooks]
-api_version = "2025-10"
+api_version = "2024-10"
+
+[pos]
+embedded = false
 
 [access.admin]
 direct_api_mode = "online"
 embedded_app_direct_api_access = true
-
-[access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = ""
-optional_scopes = [ ]
-use_legacy_install_flow = false
-
-[auth]
-redirect_urls = [ ]
-
-[pos]
-embedded = false

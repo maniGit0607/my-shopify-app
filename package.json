@@ -9,10 +9,8 @@
   ],
   "scripts": {
     "dev": "npm-run-all --parallel dev:*",
-    "dev:backend": "cd backend && npm run dev",
     "dev:ui": "cd ui && npm run dev",
     "build": "npm-run-all build:*",
-    "build:backend": "cd backend && npm run deploy",
     "build:ui": "cd ui && npm run build",
     "install:all": "npm install && cd ui && npm install && cd ../backend && npm install"
   },

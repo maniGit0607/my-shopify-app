@@ -101,10 +101,77 @@ export default function Home() {
         panelID: 'disputes-report-content',
       },
     ];
+
+    const testBackendWithToken = async () => {
+  try {
+    console.log('=== BACKEND CALL WITH SESSION TOKEN TEST ===');
+    
+    // Check if App Bridge is loaded
+    if (!window.shopify) {
+      console.error('App Bridge not loaded on window.shopify');
+      alert('App Bridge not loaded!');
+      return;
+    }
+
+    console.log('App Bridge found:', window.shopify);
+    
+    // Get session token from App Bridge
+    console.log('Requesting session token...');
+    const token = await window.shopify.idToken();
+    console.log('Session token received:', token);
+    
+    // Call YOUR backend with the token
+    const backendUrl = `http://localhost:8787/api/graphql`;
+    console.log('Calling backend:', backendUrl);
+    
+    const response = await fetch(backendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        query: `{
+          orders(first: 5) {
+            edges {
+              node {
+                id
+                name
+              }
+            }
+          }
+        }`
+      })
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', [...response.headers.entries()]);
+    
+    const data = await response.json();
+    console.log('Response data:', data);
+    
+    if (response.ok) {
+      alert('✅ Success! Check console for response');
+    } else {
+      alert('❌ Error: ' + response.status + ' - Check console');
+    }
+  } catch (err) {
+    console.error('Error:', err);
+    alert('Error: ' + err.message);
+  }
+};
   
     return (
       <Page fullWidth>
         <TitleBar title="Visualize your business" />
+
+        {/* TEST BUTTONS - Remove after testing */}
+    <div style={{ padding: '16px', background: '#ffe5e5', display: 'flex', gap: '10px' }}>
+      <button onClick={testBackendWithToken} style={{ padding: '8px 16px', background: '#e5f5ff' }}>
+        🔐 Test Backend with Session Token
+      </button>
+    </div>
+
         <Layout>
           <Layout.Section>
             <BlockStack gap="400">
