@@ -9,10 +9,10 @@ id = "8e9d532191f5496ca9594a28fc6882bc"  # Will be created on first deploy
 
 # Environment variables (set these with: wrangler secret put VARIABLE_NAME)
 [vars]
-SHOPIFY_API_KEY = "adf09a15971e32d6d1af341d9c0a7d14"
+SHOPIFY_API_KEY = "${SHOPIFY_API_KEY}"
 SHOPIFY_SCOPES = "read_orders,read_products"
 APP_URL = "http://localhost:8787"  # For OAuth callback (update with cloudflared/production URL)
 FRONTEND_URL = "http://localhost:5173"  # Frontend URL for OAuth redirects
 
 # Secrets (use: wrangler secret put SHOPIFY_API_SECRET)
-SHOPIFY_API_SECRET = "set-via-wrangler-secret"
+SHOPIFY_API_SECRET = "${SHOPIFY_API_SECRET}"
