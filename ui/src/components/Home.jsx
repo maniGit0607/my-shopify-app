@@ -18,6 +18,7 @@ import OrdersReportContent from "./reportContent/OrderReportContent";
 import ProductReportContent from "./reportContent/ProductReportContent";
 import CustomerReportContent from "./reportContent/CustomerReportContent";
 import DisputeReportContent from "./reportContent/DisputeReportContent";
+import SalesInsightsContent from "./reportContent/SalesInsightsContent";
 import OrdersPieChart from "./charts/OrdersPieChart";
 
 export default function Home() {
@@ -65,6 +66,13 @@ export default function Home() {
     }, []); */
   
     const tabs = [
+      {
+        id: 'Insights',
+        content: '📊 Sales & Growth',
+        render: <SalesInsightsContent />,
+        accessibilityLabel: 'Sales and Growth Insights',
+        panelID: 'sales-insights-content',
+      },
       {
         id: 'Orders',
         content: 'Orders Reports',
@@ -188,18 +196,21 @@ export default function Home() {
                 </Tabs>
               </Card>
               
-              <Card>
-                <div style={{ minHeight: '400px', padding: '16px' }}>
-                  {selectedTab === 0 && <OrdersPieChart filters={orderFilters} />}
-                  {selectedTab !== 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                      <Text variant="headingMd" as="h3" tone="subdued">
-                        Chart visualization will appear here
-                      </Text>
-                    </div>
-                  )}
-                </div>
-              </Card>
+              {/* Show chart card only for tabs that need it */}
+              {selectedTab !== 0 && (
+                <Card>
+                  <div style={{ minHeight: '400px', padding: '16px' }}>
+                    {selectedTab === 1 && <OrdersPieChart filters={orderFilters} />}
+                    {selectedTab !== 1 && (
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                        <Text variant="headingMd" as="h3" tone="subdued">
+                          Chart visualization will appear here
+                        </Text>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
             </BlockStack>
           </Layout.Section>
           

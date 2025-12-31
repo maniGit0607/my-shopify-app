@@ -3,6 +3,8 @@ import { Env } from './types';
 import { corsMiddleware } from './middleware/cors';
 import auth from './routes/auth';
 import api from './routes/api';
+import webhooks from './routes/webhooks';
+import insights from './routes/insights';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -13,12 +15,18 @@ app.use('/*', corsMiddleware());
 app.get('/', (c) => {
   return c.json({
     name: 'My Shopify App Backend',
-    version: '1.0.0',
+    version: '2.0.0',
     endpoints: {
       auth: '/auth',
       callback: '/auth/callback',
       graphql: '/api/graphql',
       health: '/api/health',
+      insights: '/insights/report',
+      daily: '/insights/daily',
+      products: '/insights/products',
+      events: '/insights/events',
+      summary: '/insights/summary',
+      webhooks: '/webhooks/*',
     },
   });
 });
@@ -26,6 +34,8 @@ app.get('/', (c) => {
 // Mount routes
 app.route('/auth', auth);
 app.route('/api', api);
+app.route('/webhooks', webhooks);
+app.route('/insights', insights);
 
 // 404 handler
 app.notFound((c) => {
