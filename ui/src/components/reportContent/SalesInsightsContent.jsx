@@ -465,13 +465,17 @@ export default function SalesInsightsContent() {
             </div>
             <div
               style={{
-                padding: '8px 12px',
+                padding: '6px 12px',
                 backgroundColor: '#f6f6f7',
                 border: '1px solid #c9cccf',
                 borderRadius: '8px',
                 color: '#6d7175',
                 fontSize: '14px',
                 cursor: 'not-allowed',
+                height: '36px',
+                boxSizing: 'border-box',
+                display: 'flex',
+                alignItems: 'center',
               }}
             >
               {getPeriodDateRanges(period).comparisonLabel}
