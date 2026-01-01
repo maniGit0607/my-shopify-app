@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, AnalyticsReport, PeriodMetrics } from '../types';
+import { Env, AnalyticsReport, PeriodMetrics, OrderBreakdownType } from '../types';
 import { validateSessionToken, getShop } from '../middleware/session-token';
 import { MetricsService } from '../services/metrics-service';
 import { AnalyticsEngine } from '../services/analytics-engine';
@@ -361,6 +361,92 @@ insights.get('/summary', async (c) => {
     return c.json({ error: 'Failed to fetch summary' }, 500);
   }
 });
+
+/**
+ * GET /insights/orders/breakdown
+ * Get order breakdown by type (status, channel, payment_method, discount)
+ * Query params:
+ *   - type: 'status' | 'channel' | 'payment_method' | 'discount'
+ *   - startDate: YYYY-MM-DD
+ *   - endDate: YYYY-MM-DD
+ */
+insights.get('/orders/breakdown', async (c) => {
+  const shop = getShop(c);
+  
+  if (!shop) {
+    return c.json({ error: 'Shop not found' }, 401);
+  }
+
+  try {
+    const breakdownType = c.req.query('type') as OrderBreakdownType;
+    const startDate = c.req.query('startDate');
+    const endDate = c.req.query('endDate');
+
+    // Validate breakdown type
+    const validTypes: OrderBreakdownType[] = ['status', 'channel', 'payment_method', 'discount'];
+    if (!breakdownType || !validTypes.includes(breakdownType)) {
+      return c.json({ error: 'Invalid breakdown type. Must be one of: status, channel, payment_method, discount' }, 400);
+    }
+
+    // Validate dates
+    if (!startDate || !endDate) {
+      return c.json({ error: 'startDate and endDate are required' }, 400);
+    }
+
+    const metricsService = new MetricsService(c.env);
+    const breakdown = await metricsService.getAggregatedOrderBreakdown(shop, startDate, endDate, breakdownType);
+
+    // Format breakdown values for display
+    const formattedBreakdown = breakdown.map(item => ({
+      name: formatBreakdownValue(item.breakdown_value, breakdownType),
+      value: item.order_count,
+      revenue: item.revenue,
+    }));
+
+    return c.json({
+      type: breakdownType,
+      period: { start: startDate, end: endDate },
+      data: formattedBreakdown,
+      total_orders: formattedBreakdown.reduce((sum, item) => sum + item.value, 0),
+      total_revenue: formattedBreakdown.reduce((sum, item) => sum + item.revenue, 0),
+    });
+
+  } catch (error) {
+    console.error('[Insights] Error fetching order breakdown:', error);
+    return c.json({ error: 'Failed to fetch order breakdown' }, 500);
+  }
+});
+
+/**
+ * Format breakdown values for display
+ */
+function formatBreakdownValue(value: string, type: OrderBreakdownType): string {
+  // Capitalize and format the value for display
+  const formatted = value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase());
+  
+  // Special formatting for known values
+  switch (type) {
+    case 'status':
+      return formatted || 'Unfulfilled';
+    case 'channel':
+      if (value === 'web') return 'Online Store';
+      if (value === 'pos') return 'Point of Sale';
+      if (value === 'mobile') return 'Mobile App';
+      return formatted || 'Unknown';
+    case 'payment_method':
+      if (value === 'shopify_payments') return 'Shopify Payments';
+      if (value === 'manual') return 'Manual Payment';
+      return formatted || 'Unknown';
+    case 'discount':
+      if (value === 'with_discount') return 'With Discount';
+      if (value === 'without_discount') return 'Without Discount';
+      return formatted;
+    default:
+      return formatted;
+  }
+}
 
 export default insights;
 

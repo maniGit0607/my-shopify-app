@@ -148,12 +148,49 @@ export function useInsightsFetch() {
     }
   }, [authenticatedFetch, BACKEND_URL]);
 
+  /**
+   * Get order breakdown by type
+   * @param {Object} options
+   * @param {string} options.type - 'status' | 'channel' | 'payment_method' | 'discount'
+   * @param {string} options.startDate - YYYY-MM-DD
+   * @param {string} options.endDate - YYYY-MM-DD
+   */
+  const getOrderBreakdown = useCallback(async (options = {}) => {
+    const { type, startDate, endDate } = options;
+    
+    if (!type || !startDate || !endDate) {
+      throw new Error('type, startDate, and endDate are required');
+    }
+
+    const params = new URLSearchParams();
+    params.set('type', type);
+    params.set('startDate', startDate);
+    params.set('endDate', endDate);
+
+    try {
+      const response = await authenticatedFetch(`${BACKEND_URL}/insights/orders/breakdown?${params}`, {
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Request failed: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[Insights] Failed to fetch order breakdown:', error);
+      throw error;
+    }
+  }, [authenticatedFetch, BACKEND_URL]);
+
   return {
     getReport,
     getDailyMetrics,
     getProducts,
     getSummary,
     getEvents,
+    getOrderBreakdown,
   };
 }
 

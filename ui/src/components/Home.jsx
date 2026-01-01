@@ -13,11 +13,9 @@ import {
   LegacyCard
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
-import SalesReportContent from "./reportContent/SalesReportContent";
 import OrdersReportContent from "./reportContent/OrderReportContent";
 import ProductReportContent from "./reportContent/ProductReportContent";
 import CustomerReportContent from "./reportContent/CustomerReportContent";
-import DisputeReportContent from "./reportContent/DisputeReportContent";
 import SalesInsightsContent from "./reportContent/SalesInsightsContent";
 import OrdersPieChart from "./charts/OrdersPieChart";
 
@@ -81,13 +79,6 @@ export default function Home() {
         panelID: 'orders-report-content',
       },
       {
-        id: 'Sales',
-        content: 'Sales Reports',
-        render: <SalesReportContent />,
-        accessibilityLabel: 'Sales Reports',
-        panelID: 'sales-report-content',
-      },
-      {
         id: 'Customers',
         content: 'Customers Reports',
         render: <CustomerReportContent />,
@@ -100,13 +91,6 @@ export default function Home() {
         render: <ProductReportContent />,
         accessibilityLabel: 'Products Reports',
         panelID: 'products-report-content',
-      },
-      {
-        id: 'Disputes',
-        content: 'Disputes Reports',
-        render: <DisputeReportContent />,
-        accessibilityLabel: 'Disputes Reports',
-        panelID: 'disputes-report-content',
       },
     ];
 

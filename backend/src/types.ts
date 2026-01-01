@@ -91,6 +91,26 @@ export interface ShopEvent {
   created_at?: string;
 }
 
+export type OrderBreakdownType = 'channel' | 'payment_method' | 'status' | 'discount';
+
+export interface DailyOrderBreakdown {
+  id?: number;
+  shop: string;
+  date: string;
+  breakdown_type: OrderBreakdownType;
+  breakdown_value: string;
+  order_count: number;
+  revenue: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AggregatedOrderBreakdown {
+  breakdown_value: string;
+  order_count: number;
+  revenue: number;
+}
+
 // ============ Shopify Webhook Types ============
 
 export interface ShopifyOrder {
@@ -112,6 +132,15 @@ export interface ShopifyOrder {
   line_items: ShopifyLineItem[];
   discount_codes: ShopifyDiscountCode[];
   refunds: ShopifyRefund[];
+  // Additional fields for breakdown reporting
+  source_name?: string; // e.g., 'web', 'pos', 'mobile'
+  channel_information?: {
+    channel_id?: number;
+    channel_definition?: {
+      channel_name?: string;
+    };
+  };
+  payment_gateway_names?: string[]; // e.g., ['shopify_payments', 'paypal']
 }
 
 export interface ShopifyCustomer {

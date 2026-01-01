@@ -5,104 +5,49 @@ import DateRangePicker from '../util/date/DateRangePicker';
 
 export default function OrdersReportContent({ onFilterChange }){
     const today = new Date();
-    const [selectedReport, setSelectedReport] = useState('ordersOverTime');
-    const [interval, setInterval] = useState('daily');
+    const [selectedReport, setSelectedReport] = useState('ordersByStatus');
     const [dateRange, setDateRange] = useState({
-      start: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 364),
+      start: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30),
       end: today,
     });
 
     // Send initial filter values to parent on mount
     useEffect(() => {
       if (onFilterChange) {
-        onFilterChange({ reportType: selectedReport, interval, dateRange });
+        onFilterChange({ reportType: selectedReport, dateRange });
       }
     }, []);
 
     const reportOptions = [
-        { label: 'Orders Over Time', value: 'ordersOverTime' },
+        { label: 'Orders by Status', value: 'ordersByStatus' },
         { label: 'Orders by Discount', value: 'ordersByDiscount' },
-        { label: 'Orders by Traffic Source', value: 'ordersByTrafficSource' },
         { label: 'Orders by Channel', value: 'ordersByChannel' },
         { label: 'Orders by Payment Method', value: 'ordersByPaymentMethod' },
-        { label: 'Orders by Status', value: 'ordersByStatus' },
       ];
     
       // Handler for changing the selected report
       const handleReportChange = (value) => {
         setSelectedReport(value);
         if (onFilterChange) {
-          onFilterChange({ reportType: value, interval, dateRange });
-        }
-      };
-
-      const handleIntervalChange = (value) => {
-        setInterval(value);
-        if (onFilterChange) {
-          onFilterChange({ reportType: selectedReport, interval: value, dateRange });
+          onFilterChange({ reportType: value, dateRange });
         }
       };
 
       const handleDateRangeChange = (newDateRange) => {
         setDateRange(newDateRange);
         if (onFilterChange) {
-          onFilterChange({ reportType: selectedReport, interval, dateRange: newDateRange });
+          onFilterChange({ reportType: selectedReport, dateRange: newDateRange });
         }
       };
 
       // Render content based on selected report type
   const renderReportFilters = () => {
-    switch (selectedReport) {
-      case 'ordersOverTime':
-        return (
-          <InlineStack align='space-between' blockAlign='end'>
-            <DateRangePicker onChange={handleDateRangeChange} />
-            <Select
-              label="Interval"
-              labelInline
-              options={[
-                { label: 'Daily', value: 'daily' },
-                { label: 'Weekly', value: 'weekly' },
-                { label: 'Monthly', value: 'monthly' },
-              ]}
-              value={interval}
-              onChange={handleIntervalChange}
-            />
-          </InlineStack>
-        );
-      case 'ordersByDiscount':
-        return (
-            <InlineStack align='space-between' blockAlign='end'>
-              <DateRangePicker onChange={handleDateRangeChange} />
-            </InlineStack>
-          );
-      case 'ordersByTrafficSource':
-        return (
-            <InlineStack align='space-between' blockAlign='end'>
-              <DateRangePicker onChange={handleDateRangeChange} />
-            </InlineStack>
-          );
-      case 'ordersByChannel':
-        return (
-            <InlineStack align='space-between' blockAlign='end'>
-              <DateRangePicker onChange={handleDateRangeChange} />
-            </InlineStack>
-          );
-      case 'ordersByPaymentMethod':
-        return (
-            <InlineStack align='space-between' blockAlign='end'>
-              <DateRangePicker onChange={handleDateRangeChange} />
-            </InlineStack>
-          );
-        case 'ordersByStatus':
-        return (
-            <InlineStack align='space-between' blockAlign='end'>
-                <DateRangePicker onChange={handleDateRangeChange} />
-            </InlineStack>
-            );
-      default:
-        return null;
-    }
+    // All report types use the same date range picker
+    return (
+      <InlineStack align='space-between' blockAlign='end'>
+        <DateRangePicker onChange={handleDateRangeChange} />
+      </InlineStack>
+    );
   };
 
   return (

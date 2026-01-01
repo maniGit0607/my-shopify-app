@@ -5,7 +5,10 @@ import {
   DailyCustomerMetrics,
   ShopEvent,
   PeriodMetrics,
-  ProductPeriodMetrics
+  ProductPeriodMetrics,
+  OrderBreakdownType,
+  DailyOrderBreakdown,
+  AggregatedOrderBreakdown
 } from '../types';
 
 /**
@@ -386,6 +389,68 @@ export class MetricsService {
     await this.db.prepare(
       'INSERT OR IGNORE INTO processed_webhooks (shop, webhook_id, topic) VALUES (?, ?, ?)'
     ).bind(shop, webhookId, topic).run();
+  }
+
+  // ============ Order Breakdown CRUD ============
+
+  /**
+   * Increment order breakdown metrics
+   */
+  async incrementOrderBreakdown(
+    shop: string,
+    date: string,
+    breakdownType: OrderBreakdownType,
+    breakdownValue: string,
+    increments: { orderCount?: number; revenue?: number }
+  ): Promise<void> {
+    const existing = await this.db.prepare(
+      'SELECT * FROM daily_order_breakdown WHERE shop = ? AND date = ? AND breakdown_type = ? AND breakdown_value = ?'
+    ).bind(shop, date, breakdownType, breakdownValue).first();
+
+    if (existing) {
+      await this.db.prepare(`
+        UPDATE daily_order_breakdown SET
+          order_count = order_count + ?,
+          revenue = revenue + ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE shop = ? AND date = ? AND breakdown_type = ? AND breakdown_value = ?
+      `).bind(
+        increments.orderCount ?? 0,
+        increments.revenue ?? 0,
+        shop, date, breakdownType, breakdownValue
+      ).run();
+    } else {
+      await this.db.prepare(`
+        INSERT INTO daily_order_breakdown (shop, date, breakdown_type, breakdown_value, order_count, revenue)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        shop, date, breakdownType, breakdownValue,
+        increments.orderCount ?? 0,
+        increments.revenue ?? 0
+      ).run();
+    }
+  }
+
+  /**
+   * Get aggregated order breakdown for a date range and type
+   */
+  async getAggregatedOrderBreakdown(
+    shop: string,
+    startDate: string,
+    endDate: string,
+    breakdownType: OrderBreakdownType
+  ): Promise<AggregatedOrderBreakdown[]> {
+    const result = await this.db.prepare(`
+      SELECT 
+        breakdown_value,
+        SUM(order_count) as order_count,
+        SUM(revenue) as revenue
+      FROM daily_order_breakdown 
+      WHERE shop = ? AND date >= ? AND date <= ? AND breakdown_type = ?
+      GROUP BY breakdown_value
+      ORDER BY order_count DESC
+    `).bind(shop, startDate, endDate, breakdownType).all<AggregatedOrderBreakdown>();
+    return result.results || [];
   }
 
   // ============ Aggregation Helpers ============

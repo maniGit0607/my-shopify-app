@@ -130,6 +130,35 @@ webhooks.post('/orders/create', async (c) => {
       returningCustomers: isNewCustomer ? 0 : 1,
     });
 
+    // Update order breakdown metrics
+    // Channel breakdown
+    const channel = order.source_name || 'unknown';
+    await metricsService.incrementOrderBreakdown(shop, date, 'channel', channel, {
+      orderCount: 1,
+      revenue,
+    });
+
+    // Payment method breakdown
+    const paymentMethod = order.payment_gateway_names?.[0] || 'unknown';
+    await metricsService.incrementOrderBreakdown(shop, date, 'payment_method', paymentMethod, {
+      orderCount: 1,
+      revenue,
+    });
+
+    // Status breakdown (initial status is typically unfulfilled)
+    const status = order.fulfillment_status || 'unfulfilled';
+    await metricsService.incrementOrderBreakdown(shop, date, 'status', status, {
+      orderCount: 1,
+      revenue,
+    });
+
+    // Discount breakdown
+    const discountStatus = hasDiscount ? 'with_discount' : 'without_discount';
+    await metricsService.incrementOrderBreakdown(shop, date, 'discount', discountStatus, {
+      orderCount: 1,
+      revenue,
+    });
+
     // Log significant events
     if (revenue > 500) {
       await metricsService.logEvent({
