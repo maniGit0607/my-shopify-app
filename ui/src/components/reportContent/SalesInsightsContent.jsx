@@ -40,123 +40,138 @@ function formatShortDate(date) {
 }
 
 /**
- * Get comparison period info (label and date range) based on selected period
+ * Format date range as string
  */
-function getComparisonPeriodInfo(period) {
+function formatDateRange(startDate, endDate) {
+  if (startDate.getTime() === endDate.getTime()) {
+    return formatShortDate(startDate);
+  }
+  return `${formatShortDate(startDate)} - ${formatShortDate(endDate)}`;
+}
+
+/**
+ * Get both current period and comparison period date ranges
+ */
+function getPeriodDateRanges(period) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   
-  let label = 'Previous period';
-  let startDate, endDate;
+  let currentStart, currentEnd, compStart, compEnd, compLabel;
 
   switch (period) {
     case 'today': {
-      label = 'Yesterday';
+      currentStart = today;
+      currentEnd = today;
+      compLabel = 'Yesterday';
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      startDate = yesterday;
-      endDate = yesterday;
+      compStart = yesterday;
+      compEnd = yesterday;
       break;
     }
     case 'yesterday': {
-      label = 'Day before yesterday';
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      currentStart = yesterday;
+      currentEnd = yesterday;
+      compLabel = 'Day before yesterday';
       const dayBefore = new Date(today);
       dayBefore.setDate(dayBefore.getDate() - 2);
-      startDate = dayBefore;
-      endDate = dayBefore;
+      compStart = dayBefore;
+      compEnd = dayBefore;
       break;
     }
     case 'last7days': {
-      label = 'Previous 7 days';
-      // Current period: today - 7 days to today
-      // Comparison: (today - 14 days) to (today - 8 days)
-      const compEnd = new Date(today);
-      compEnd.setDate(compEnd.getDate() - 8);
-      const compStart = new Date(today);
-      compStart.setDate(compStart.getDate() - 14);
-      startDate = compStart;
-      endDate = compEnd;
+      const start = new Date(today);
+      start.setDate(start.getDate() - 6);
+      currentStart = start;
+      currentEnd = today;
+      compLabel = 'Previous 7 days';
+      compEnd = new Date(start);
+      compEnd.setDate(compEnd.getDate() - 1);
+      compStart = new Date(compEnd);
+      compStart.setDate(compStart.getDate() - 6);
       break;
     }
     case 'last30days': {
-      label = 'Previous 30 days';
-      // Current period: today - 30 days to today
-      // Comparison: (today - 60 days) to (today - 31 days)
-      const compEnd = new Date(today);
-      compEnd.setDate(compEnd.getDate() - 31);
-      const compStart = new Date(today);
-      compStart.setDate(compStart.getDate() - 60);
-      startDate = compStart;
-      endDate = compEnd;
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      currentStart = start;
+      currentEnd = today;
+      compLabel = 'Previous 30 days';
+      compEnd = new Date(start);
+      compEnd.setDate(compEnd.getDate() - 1);
+      compStart = new Date(compEnd);
+      compStart.setDate(compStart.getDate() - 29);
       break;
     }
     case 'thisMonth': {
-      label = 'Previous equivalent period';
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      currentStart = monthStart;
+      currentEnd = today;
+      compLabel = 'Previous period';
       const daysInPeriod = Math.ceil((today - monthStart) / (1000 * 60 * 60 * 24)) + 1;
-      const compEnd = new Date(monthStart);
+      compEnd = new Date(monthStart);
       compEnd.setDate(compEnd.getDate() - 1);
-      const compStart = new Date(compEnd);
+      compStart = new Date(compEnd);
       compStart.setDate(compStart.getDate() - daysInPeriod + 1);
-      startDate = compStart;
-      endDate = compEnd;
       break;
     }
     case 'lastMonth': {
-      label = 'Month before last';
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      currentStart = lastMonthStart;
+      currentEnd = lastMonthEnd;
+      compLabel = 'Month before last';
       const daysInPeriod = Math.ceil((lastMonthEnd - lastMonthStart) / (1000 * 60 * 60 * 24)) + 1;
-      const compEnd = new Date(lastMonthStart);
+      compEnd = new Date(lastMonthStart);
       compEnd.setDate(compEnd.getDate() - 1);
-      const compStart = new Date(compEnd);
+      compStart = new Date(compEnd);
       compStart.setDate(compStart.getDate() - daysInPeriod + 1);
-      startDate = compStart;
-      endDate = compEnd;
       break;
     }
     case 'thisQuarter': {
-      label = 'Previous equivalent period';
       const quarter = Math.floor(now.getMonth() / 3);
       const quarterStart = new Date(now.getFullYear(), quarter * 3, 1);
+      currentStart = quarterStart;
+      currentEnd = today;
+      compLabel = 'Previous period';
       const daysInPeriod = Math.ceil((today - quarterStart) / (1000 * 60 * 60 * 24)) + 1;
-      const compEnd = new Date(quarterStart);
+      compEnd = new Date(quarterStart);
       compEnd.setDate(compEnd.getDate() - 1);
-      const compStart = new Date(compEnd);
+      compStart = new Date(compEnd);
       compStart.setDate(compStart.getDate() - daysInPeriod + 1);
-      startDate = compStart;
-      endDate = compEnd;
       break;
     }
     case 'thisYear': {
-      label = 'Previous equivalent period';
       const yearStart = new Date(now.getFullYear(), 0, 1);
+      currentStart = yearStart;
+      currentEnd = today;
+      compLabel = 'Previous period';
       const daysInPeriod = Math.ceil((today - yearStart) / (1000 * 60 * 60 * 24)) + 1;
-      const compEnd = new Date(yearStart);
+      compEnd = new Date(yearStart);
       compEnd.setDate(compEnd.getDate() - 1);
-      const compStart = new Date(compEnd);
+      compStart = new Date(compEnd);
       compStart.setDate(compStart.getDate() - daysInPeriod + 1);
-      startDate = compStart;
-      endDate = compEnd;
       break;
     }
     default: {
-      const compEnd = new Date(today);
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      currentStart = start;
+      currentEnd = today;
+      compLabel = 'Previous period';
+      compEnd = new Date(start);
       compEnd.setDate(compEnd.getDate() - 1);
-      startDate = compEnd;
-      endDate = compEnd;
+      compStart = compEnd;
     }
   }
 
-  // Format date range string
-  let dateRange;
-  if (startDate.getTime() === endDate.getTime()) {
-    dateRange = formatShortDate(startDate);
-  } else {
-    dateRange = `${formatShortDate(startDate)} - ${formatShortDate(endDate)}`;
-  }
-
-  return { label, dateRange };
+  return {
+    currentDateRange: formatDateRange(currentStart, currentEnd),
+    comparisonLabel: compLabel,
+    comparisonDateRange: formatDateRange(compStart, compEnd),
+  };
 }
 
 // Severity colors
@@ -428,9 +443,15 @@ export default function SalesInsightsContent() {
       <InlineStack align="space-between" blockAlign="end">
         <Text variant="headingMd" as="h2">Sales & Growth Insights</Text>
         <InlineStack gap="300" blockAlign="end">
-          <div style={{ width: '160px' }}>
+          <div style={{ width: '200px' }}>
+            <div style={{ marginBottom: '4px' }}>
+              <Text variant="bodySm">
+                Period <span style={{ color: '#8c9196' }}>({getPeriodDateRanges(period).currentDateRange})</span>
+              </Text>
+            </div>
             <Select
               label="Period"
+              labelHidden
               options={PERIOD_OPTIONS}
               value={period}
               onChange={handlePeriodChange}
@@ -438,7 +459,9 @@ export default function SalesInsightsContent() {
           </div>
           <div style={{ width: '200px' }}>
             <div style={{ marginBottom: '4px' }}>
-              <Text variant="bodySm" tone="subdued">Compared to</Text>
+              <Text variant="bodySm">
+                Compared to <span style={{ color: '#8c9196' }}>({getPeriodDateRanges(period).comparisonDateRange})</span>
+              </Text>
             </div>
             <div
               style={{
@@ -451,10 +474,7 @@ export default function SalesInsightsContent() {
                 cursor: 'not-allowed',
               }}
             >
-              <div>{getComparisonPeriodInfo(period).label}</div>
-              <div style={{ fontSize: '11px', color: '#8c9196', marginTop: '2px' }}>
-                {getComparisonPeriodInfo(period).dateRange}
-              </div>
+              {getPeriodDateRanges(period).comparisonLabel}
             </div>
           </div>
         </InlineStack>
