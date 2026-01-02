@@ -18,8 +18,8 @@ interface ShopifyOrderEdge {
     name: string;
     createdAt: string;
     cancelledAt: string | null;
-    financialStatus: string;
-    fulfillmentStatus: string | null;
+    displayFinancialStatus: string;
+    displayFulfillmentStatus: string | null;
     totalPriceSet: {
       shopMoney: {
         amount: string;
@@ -33,7 +33,7 @@ interface ShopifyOrderEdge {
     };
     customer: {
       id: string;
-      ordersCount: string;
+      numberOfOrders: number;
     } | null;
     lineItems: {
       edges: {
@@ -211,8 +211,8 @@ export class ReconciliationService {
               name
               createdAt
               cancelledAt
-              financialStatus
-              fulfillmentStatus
+              displayFinancialStatus
+              displayFulfillmentStatus
               totalPriceSet {
                 shopMoney {
                   amount
@@ -226,7 +226,7 @@ export class ReconciliationService {
               }
               customer {
                 id
-                ordersCount
+                numberOfOrders
               }
               lineItems(first: 50) {
                 edges {
@@ -307,7 +307,7 @@ export class ReconciliationService {
 
     // Determine if new or returning customer
     const isNewCustomer = order.customer 
-      ? parseInt(order.customer.ordersCount) <= 1 
+      ? order.customer.numberOfOrders <= 1 
       : true;
 
     // Check if order was cancelled
@@ -369,7 +369,7 @@ export class ReconciliationService {
     });
 
     // Status breakdown
-    const status = order.fulfillmentStatus || 'unfulfilled';
+    const status = order.displayFulfillmentStatus || 'UNFULFILLED';
     await this.metricsService.incrementOrderBreakdown(shop, date, 'status', status.toLowerCase(), {
       orderCount: 1,
       revenue,
