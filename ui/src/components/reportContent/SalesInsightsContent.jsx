@@ -496,7 +496,7 @@ export default function SalesInsightsContent() {
       {/* Key Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         <MetricCard
-          title="Total Revenue"
+          title="Net Revenue"
           value={metrics?.revenue || 0}
           comparison={comparison_metrics?.revenue}
           trend={trends?.revenue_trend}
@@ -595,6 +595,12 @@ export default function SalesInsightsContent() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
             <Box padding="300" background="bg-surface-secondary" borderRadius="200">
               <BlockStack gap="100">
+                <Text variant="bodySm" tone="subdued">Gross Revenue</Text>
+                <Text variant="headingMd">{formatCurrency(metrics?.grossRevenue || 0)}</Text>
+              </BlockStack>
+            </Box>
+            <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+              <BlockStack gap="100">
                 <Text variant="bodySm" tone="subdued">New Customer Orders</Text>
                 <Text variant="headingMd">{metrics?.newCustomerOrders || 0}</Text>
               </BlockStack>
@@ -622,6 +628,14 @@ export default function SalesInsightsContent() {
                 <Text variant="bodySm" tone="subdued">Refunds</Text>
                 <Text variant="headingMd" tone={metrics?.refundTotal > 0 ? 'critical' : undefined}>
                   {formatCurrency(metrics?.refundTotal || 0)}
+                </Text>
+              </BlockStack>
+            </Box>
+            <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+              <BlockStack gap="100">
+                <Text variant="bodySm" tone="subdued">Cancelled Revenue</Text>
+                <Text variant="headingMd" tone={metrics?.cancelledRevenue > 0 ? 'warning' : undefined}>
+                  {formatCurrency(metrics?.cancelledRevenue || 0)}
                 </Text>
               </BlockStack>
             </Box>

@@ -327,9 +327,18 @@ insights.get('/summary', async (c) => {
     const thisMonthMetrics = metricsService.calculateAOV(metricsService.aggregateToPeriodMetrics(thisMonthDaily));
     const lastMonthMetrics = metricsService.calculateAOV(metricsService.aggregateToPeriodMetrics(lastMonthDaily));
 
-    // Calculate changes
-    const todayRevenue = todayMetrics?.total_revenue || 0;
-    const yesterdayRevenue = yesterdayMetrics?.total_revenue || 0;
+    // Calculate NET revenue for today and yesterday
+    // Net revenue = gross revenue - cancelled revenue - refunds
+    const todayGross = todayMetrics?.total_revenue || 0;
+    const todayCancelled = todayMetrics?.cancelled_revenue || 0;
+    const todayRefunds = todayMetrics?.total_refunds || 0;
+    const todayRevenue = todayGross - todayCancelled - todayRefunds;
+
+    const yesterdayGross = yesterdayMetrics?.total_revenue || 0;
+    const yesterdayCancelled = yesterdayMetrics?.cancelled_revenue || 0;
+    const yesterdayRefunds = yesterdayMetrics?.total_refunds || 0;
+    const yesterdayRevenue = yesterdayGross - yesterdayCancelled - yesterdayRefunds;
+
     const dailyChange = yesterdayRevenue > 0 
       ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
       : 0;
@@ -340,12 +349,14 @@ insights.get('/summary', async (c) => {
 
     return c.json({
       today: {
-        revenue: todayRevenue,
+        revenue: todayRevenue,  // NET revenue
+        grossRevenue: todayGross,
         orders: todayMetrics?.total_orders || 0,
         change: dailyChange
       },
       this_month: {
-        revenue: thisMonthMetrics.revenue,
+        revenue: thisMonthMetrics.revenue,  // NET revenue
+        grossRevenue: thisMonthMetrics.grossRevenue,
         orders: thisMonthMetrics.orders,
         aov: thisMonthMetrics.aov,
         change: monthlyChange

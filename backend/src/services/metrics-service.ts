@@ -457,10 +457,11 @@ export class MetricsService {
 
   /**
    * Aggregate daily metrics into period metrics
+   * Note: revenue is calculated as NET revenue (total_revenue - cancelled_revenue - total_refunds)
    */
   aggregateToPeriodMetrics(dailyMetrics: DailyMetrics[]): PeriodMetrics {
-    return dailyMetrics.reduce((acc, day) => ({
-      revenue: acc.revenue + day.total_revenue,
+    const aggregated = dailyMetrics.reduce((acc, day) => ({
+      grossRevenue: acc.grossRevenue + day.total_revenue,
       orders: acc.orders + day.total_orders,
       aov: 0, // Calculate after
       newCustomerOrders: acc.newCustomerOrders + day.new_customer_orders,
@@ -473,7 +474,7 @@ export class MetricsService {
       cancelledOrders: acc.cancelledOrders + day.cancelled_orders,
       cancelledRevenue: acc.cancelledRevenue + day.cancelled_revenue,
     }), {
-      revenue: 0,
+      grossRevenue: 0,
       orders: 0,
       aov: 0,
       newCustomerOrders: 0,
@@ -485,7 +486,26 @@ export class MetricsService {
       refundCount: 0,
       cancelledOrders: 0,
       cancelledRevenue: 0,
-    } as PeriodMetrics);
+    });
+
+    // Calculate NET revenue: gross - cancelled - refunds
+    const netRevenue = aggregated.grossRevenue - aggregated.cancelledRevenue - aggregated.refundTotal;
+
+    return {
+      revenue: netRevenue, // This is now NET revenue
+      grossRevenue: aggregated.grossRevenue,
+      orders: aggregated.orders,
+      aov: 0,
+      newCustomerOrders: aggregated.newCustomerOrders,
+      returningCustomerOrders: aggregated.returningCustomerOrders,
+      itemsSold: aggregated.itemsSold,
+      discountTotal: aggregated.discountTotal,
+      ordersWithDiscount: aggregated.ordersWithDiscount,
+      refundTotal: aggregated.refundTotal,
+      refundCount: aggregated.refundCount,
+      cancelledOrders: aggregated.cancelledOrders,
+      cancelledRevenue: aggregated.cancelledRevenue,
+    } as PeriodMetrics;
   }
 
   /**

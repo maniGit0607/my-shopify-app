@@ -196,7 +196,8 @@ export interface Insight {
 }
 
 export interface PeriodMetrics {
-  revenue: number;
+  revenue: number;        // NET revenue (grossRevenue - cancelledRevenue - refundTotal)
+  grossRevenue: number;   // Total revenue before cancellations and refunds
   orders: number;
   aov: number;
   newCustomerOrders: number;
