@@ -247,10 +247,12 @@ webhooks.post('/orders/cancelled', async (c) => {
     }
 
     const order: ShopifyOrder = JSON.parse(rawBody);
-    const date = order.cancelled_at ? extractDate(order.cancelled_at) : extractDate(new Date().toISOString());
+    // Use ORDER CREATION date, not cancellation date
+    // This ensures cancelled revenue offsets the original revenue on the same day
+    const date = extractDate(order.created_at);
     const revenue = parseFloat(order.total_price);
     
-    console.log(`[Webhook] Processing cancellation for order ${order.id} on ${date}`);
+    console.log(`[Webhook] Processing cancellation for order ${order.id} (created ${date}, cancelled ${order.cancelled_at})`);
 
     // Update daily metrics with cancellation
     await metricsService.incrementDailyMetrics(shop, date, {
@@ -258,14 +260,15 @@ webhooks.post('/orders/cancelled', async (c) => {
       cancelledRevenue: revenue,
     });
 
-    // Log the cancellation event
+    // Log the cancellation event (use cancellation date for the event log)
+    const cancellationDate = order.cancelled_at ? extractDate(order.cancelled_at) : date;
     await metricsService.logEvent({
       shop,
-      date,
+      date: cancellationDate,
       event_type: 'order_cancelled',
-      description: `Order #${order.order_number} cancelled ($${revenue.toFixed(2)})`,
+      description: `Order #${order.order_number} cancelled ($${revenue.toFixed(2)}) - originally placed ${date}`,
       impact_amount: -revenue,
-      metadata: JSON.stringify({ order_id: order.id, order_number: order.order_number }),
+      metadata: JSON.stringify({ order_id: order.id, order_number: order.order_number, original_date: date }),
     });
 
     // Mark webhook as processed

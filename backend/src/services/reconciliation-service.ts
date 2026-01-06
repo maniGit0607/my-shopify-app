@@ -314,8 +314,10 @@ export class ReconciliationService {
     const isCancelled = order.cancelledAt !== null;
 
     // Update daily metrics
+    // Always add to gross revenue (even if cancelled) - net revenue is calculated as:
+    // net = gross - cancelledRevenue - refunds
     await this.metricsService.incrementDailyMetrics(shop, date, {
-      revenue: isCancelled ? 0 : revenue,
+      revenue: revenue,  // Always add to gross
       orders: 1,
       newCustomerOrders: isNewCustomer ? 1 : 0,
       returningCustomerOrders: isNewCustomer ? 0 : 1,
@@ -323,7 +325,7 @@ export class ReconciliationService {
       discounts,
       ordersWithDiscount: hasDiscount ? 1 : 0,
       cancelledOrders: isCancelled ? 1 : 0,
-      cancelledRevenue: isCancelled ? revenue : 0,
+      cancelledRevenue: isCancelled ? revenue : 0,  // Track separately for net calculation
     });
 
     // Update product metrics
