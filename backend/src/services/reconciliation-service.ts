@@ -19,7 +19,7 @@ interface ShopifyCustomerEdge {
     email: string;
     firstName: string;
     lastName: string;
-    ordersCount: string;
+    numberOfOrders: string;
     totalSpentV2: {
       amount: string;
       currencyCode: string;
@@ -472,7 +472,7 @@ export class ReconciliationService {
               email
               firstName
               lastName
-              ordersCount
+              numberOfOrders
               totalSpentV2 {
                 amount
                 currencyCode
@@ -519,7 +519,7 @@ export class ReconciliationService {
     const country = customer.defaultAddress?.country || 'Unknown';
     const countryCode = customer.defaultAddress?.countryCodeV2 || null;
     const totalSpent = parseFloat(customer.totalSpentV2.amount) || 0;
-    const ordersCount = parseInt(customer.ordersCount) || 0;
+    const ordersCount = parseInt(customer.numberOfOrders) || 0;
 
     // Aggregate into customer geography
     await this.metricsService.upsertCustomerGeography(shop, country, countryCode, {
