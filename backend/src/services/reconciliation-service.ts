@@ -20,7 +20,7 @@ interface ShopifyCustomerEdge {
     firstName: string;
     lastName: string;
     numberOfOrders: string;
-    totalSpentV2: {
+    amountSpent: {
       amount: string;
       currencyCode: string;
     };
@@ -202,6 +202,12 @@ export class ReconciliationService {
         if (customerResponse.errors) {
           console.error('[Reconciliation] Customer fetch error:', customerResponse.errors[0].message);
           // Don't fail entire reconciliation if customers fail, just log and continue
+          break;
+        }
+
+        // Check for valid response structure
+        if (!customerResponse.data?.customers?.edges) {
+          console.error('[Reconciliation] Invalid customer response structure:', JSON.stringify(customerResponse));
           break;
         }
 
@@ -473,7 +479,7 @@ export class ReconciliationService {
               firstName
               lastName
               numberOfOrders
-              totalSpentV2 {
+              amountSpent {
                 amount
                 currencyCode
               }
@@ -518,7 +524,7 @@ export class ReconciliationService {
   private async processCustomer(shop: string, customer: ShopifyCustomerEdge['node']): Promise<void> {
     const country = customer.defaultAddress?.country || 'Unknown';
     const countryCode = customer.defaultAddress?.countryCodeV2 || null;
-    const totalSpent = parseFloat(customer.totalSpentV2.amount) || 0;
+    const totalSpent = parseFloat(customer.amountSpent?.amount || '0') || 0;
     const ordersCount = parseInt(customer.numberOfOrders) || 0;
 
     // Aggregate into customer geography
