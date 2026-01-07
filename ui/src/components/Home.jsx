@@ -6,7 +6,6 @@ import {
   Card,
   InlineStack,
   BlockStack,
-  Link,
   Text,
   Button,
   Banner,
@@ -180,38 +179,15 @@ export default function Home() {
                 </Tabs>
               </Card>
               
-              {/* Show chart card only for tabs that need it */}
-              {selectedTab !== 0 && (
+              {/* Show chart card only for Order Reports */}
+              {selectedTab === 1 && (
                 <Card>
                   <div style={{ minHeight: '400px', padding: '16px' }}>
-                    {selectedTab === 1 && <OrdersPieChart filters={orderFilters} />}
-                    {selectedTab !== 1 && (
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                        <Text variant="headingMd" as="h3" tone="subdued">
-                          Chart visualization will appear here
-                        </Text>
-                      </div>
-                    )}
+                    <OrdersPieChart filters={orderFilters} />
                   </div>
                 </Card>
               )}
             </BlockStack>
-          </Layout.Section>
-          
-          <Layout.Section variant="oneThird">
-            <Card>
-              <BlockStack gap="200">
-                <Text as="h2" variant="headingMd">
-                  Saved Reports
-                </Text>
-                <BlockStack gap="200">
-                  <Link target="blank" removeUnderline>Total Sales August 2024</Link>
-                  <Link target="blank" removeUnderline>Total Orders last 2 years</Link>
-                  <Link target="blank" removeUnderline>Last 3 monthly sales</Link>
-                  <Link target="blank" removeUnderline>Products sold by variants</Link>
-                </BlockStack>
-              </BlockStack>
-            </Card>
           </Layout.Section>
         </Layout>
       </Page>
