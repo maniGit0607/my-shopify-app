@@ -111,6 +111,38 @@ export interface AggregatedOrderBreakdown {
   revenue: number;
 }
 
+export interface CustomerGeography {
+  id?: number;
+  shop: string;
+  country: string;
+  country_code?: string;
+  customer_count: number;
+  total_spent: number;
+  total_orders: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ShopifyCustomerAddress {
+  country: string;
+  country_code: string;
+  province?: string;
+  city?: string;
+}
+
+export interface ShopifyCustomerFull {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  orders_count: number;
+  total_spent: string;
+  default_address?: ShopifyCustomerAddress;
+  addresses?: ShopifyCustomerAddress[];
+  created_at: string;
+  updated_at: string;
+}
+
 // ============ Shopify Webhook Types ============
 
 export interface ShopifyOrder {

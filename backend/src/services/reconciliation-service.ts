@@ -6,10 +6,44 @@ interface ReconciliationProgress {
   status: 'running' | 'completed' | 'failed';
   ordersProcessed: number;
   totalOrders: number;
+  customersProcessed: number;
   currentPage: number;
   startedAt: string;
   completedAt?: string;
   error?: string;
+}
+
+interface ShopifyCustomerEdge {
+  node: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    ordersCount: string;
+    totalSpentV2: {
+      amount: string;
+      currencyCode: string;
+    };
+    defaultAddress: {
+      country: string;
+      countryCodeV2: string;
+    } | null;
+    createdAt: string;
+  };
+  cursor: string;
+}
+
+interface CustomersQueryResponse {
+  data: {
+    customers: {
+      edges: ShopifyCustomerEdge[];
+      pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string;
+      };
+    };
+  };
+  errors?: { message: string }[];
 }
 
 interface ShopifyOrderEdge {
@@ -104,6 +138,7 @@ export class ReconciliationService {
       status: 'running',
       ordersProcessed: 0,
       totalOrders: 0,
+      customersProcessed: 0,
       currentPage: 0,
       startedAt: new Date().toISOString(),
     };
@@ -155,11 +190,45 @@ export class ReconciliationService {
         }
       }
 
+      console.log(`[Reconciliation] Orders completed. Starting customer reconciliation...`);
+
+      // Now reconcile customers for geography data
+      let customerHasNextPage = true;
+      let customerCursor: string | null = null;
+
+      while (customerHasNextPage) {
+        const customerResponse = await this.fetchCustomersPage(shop, accessToken, customerCursor);
+        
+        if (customerResponse.errors) {
+          console.error('[Reconciliation] Customer fetch error:', customerResponse.errors[0].message);
+          // Don't fail entire reconciliation if customers fail, just log and continue
+          break;
+        }
+
+        const { edges, pageInfo } = customerResponse.data.customers;
+        
+        // Process each customer
+        for (const edge of edges) {
+          await this.processCustomer(shop, edge.node);
+          progress.customersProcessed++;
+        }
+
+        customerHasNextPage = pageInfo.hasNextPage;
+        customerCursor = pageInfo.endCursor;
+
+        console.log(`[Reconciliation] Processed customers: ${progress.customersProcessed}`);
+        
+        // Small delay to avoid rate limits
+        if (customerHasNextPage) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
       progress.status = 'completed';
       progress.completedAt = new Date().toISOString();
       progress.totalOrders = progress.ordersProcessed;
 
-      console.log(`[Reconciliation] Completed! Total orders processed: ${progress.ordersProcessed}`);
+      console.log(`[Reconciliation] Completed! Orders: ${progress.ordersProcessed}, Customers: ${progress.customersProcessed}`);
 
       return progress;
 
@@ -189,6 +258,7 @@ export class ReconciliationService {
     await db.prepare('DELETE FROM daily_customer_metrics WHERE shop = ?').bind(shop).run();
     await db.prepare('DELETE FROM daily_order_breakdown WHERE shop = ?').bind(shop).run();
     await db.prepare('DELETE FROM shop_events WHERE shop = ?').bind(shop).run();
+    await db.prepare('DELETE FROM customer_geography WHERE shop = ?').bind(shop).run();
     
     console.log(`[Reconciliation] Cleared all existing metrics for shop: ${shop}`);
   }
@@ -382,6 +452,80 @@ export class ReconciliationService {
     await this.metricsService.incrementOrderBreakdown(shop, date, 'discount', discountStatus, {
       orderCount: 1,
       revenue,
+    });
+  }
+
+  /**
+   * Fetch a page of customers from Shopify GraphQL API
+   */
+  private async fetchCustomersPage(
+    shop: string,
+    accessToken: string,
+    cursor: string | null
+  ): Promise<CustomersQueryResponse> {
+    const query = `
+      query GetCustomers($cursor: String) {
+        customers(first: 250, after: $cursor) {
+          edges {
+            node {
+              id
+              email
+              firstName
+              lastName
+              ordersCount
+              totalSpentV2 {
+                amount
+                currencyCode
+              }
+              defaultAddress {
+                country
+                countryCodeV2
+              }
+              createdAt
+            }
+            cursor
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    `;
+
+    const response = await fetch(`https://${shop}/admin/api/2024-01/graphql.json`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': accessToken,
+      },
+      body: JSON.stringify({
+        query,
+        variables: { cursor },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`GraphQL request failed: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Process a single customer and aggregate geography data
+   */
+  private async processCustomer(shop: string, customer: ShopifyCustomerEdge['node']): Promise<void> {
+    const country = customer.defaultAddress?.country || 'Unknown';
+    const countryCode = customer.defaultAddress?.countryCodeV2 || null;
+    const totalSpent = parseFloat(customer.totalSpentV2.amount) || 0;
+    const ordersCount = parseInt(customer.ordersCount) || 0;
+
+    // Aggregate into customer geography
+    await this.metricsService.upsertCustomerGeography(shop, country, countryCode, {
+      customerCount: 1,
+      totalSpent,
+      totalOrders: ordersCount,
     });
   }
 }

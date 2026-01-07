@@ -459,5 +459,45 @@ function formatBreakdownValue(value: string, type: OrderBreakdownType): string {
   }
 }
 
+/**
+ * GET /insights/customers/geography
+ * Get customer distribution by country
+ */
+insights.get('/customers/geography', async (c) => {
+  const shop = getShop(c);
+  if (!shop) {
+    return c.json({ error: 'Shop not found' }, 400);
+  }
+
+  try {
+    const metricsService = new MetricsService(c.env);
+    const geography = await metricsService.getCustomerGeography(shop);
+    
+    // Calculate totals and percentages
+    const totalCustomers = geography.reduce((sum, g) => sum + g.customer_count, 0);
+    const totalSpent = geography.reduce((sum, g) => sum + g.total_spent, 0);
+    
+    // Format for pie chart consumption
+    const data = geography.map(g => ({
+      name: g.country,
+      code: g.country_code,
+      value: g.customer_count,
+      percentage: totalCustomers > 0 ? (g.customer_count / totalCustomers * 100).toFixed(1) : '0',
+      total_spent: g.total_spent,
+      total_orders: g.total_orders,
+    }));
+
+    return c.json({
+      data,
+      total_customers: totalCustomers,
+      total_spent: totalSpent,
+    });
+
+  } catch (error) {
+    console.error('[Insights] Error fetching customer geography:', error);
+    return c.json({ error: 'Failed to fetch customer geography' }, 500);
+  }
+});
+
 export default insights;
 

@@ -184,6 +184,27 @@ export function useInsightsFetch() {
     }
   }, [authenticatedFetch, BACKEND_URL]);
 
+  /**
+   * Get customer geography data
+   */
+  const getCustomerGeography = useCallback(async () => {
+    try {
+      const response = await authenticatedFetch(`${BACKEND_URL}/insights/customers/geography`, {
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Request failed: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[Insights] Failed to fetch customer geography:', error);
+      throw error;
+    }
+  }, [authenticatedFetch, BACKEND_URL]);
+
   return {
     getReport,
     getDailyMetrics,
@@ -191,6 +212,7 @@ export function useInsightsFetch() {
     getSummary,
     getEvents,
     getOrderBreakdown,
+    getCustomerGeography,
   };
 }
 

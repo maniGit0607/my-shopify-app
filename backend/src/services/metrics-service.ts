@@ -8,7 +8,8 @@ import {
   ProductPeriodMetrics,
   OrderBreakdownType,
   DailyOrderBreakdown,
-  AggregatedOrderBreakdown
+  AggregatedOrderBreakdown,
+  CustomerGeography
 } from '../types';
 
 /**
@@ -451,6 +452,87 @@ export class MetricsService {
       ORDER BY order_count DESC
     `).bind(shop, startDate, endDate, breakdownType).all<AggregatedOrderBreakdown>();
     return result.results || [];
+  }
+
+  // ============ Customer Geography CRUD ============
+
+  /**
+   * Upsert customer geography data
+   */
+  async upsertCustomerGeography(
+    shop: string,
+    country: string,
+    countryCode: string | null,
+    increments: { customerCount?: number; totalSpent?: number; totalOrders?: number }
+  ): Promise<void> {
+    const existing = await this.db.prepare(
+      'SELECT * FROM customer_geography WHERE shop = ? AND country = ?'
+    ).bind(shop, country).first();
+
+    if (existing) {
+      await this.db.prepare(`
+        UPDATE customer_geography SET
+          customer_count = customer_count + ?,
+          total_spent = total_spent + ?,
+          total_orders = total_orders + ?,
+          country_code = COALESCE(?, country_code),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE shop = ? AND country = ?
+      `).bind(
+        increments.customerCount ?? 0,
+        increments.totalSpent ?? 0,
+        increments.totalOrders ?? 0,
+        countryCode,
+        shop, country
+      ).run();
+    } else {
+      await this.db.prepare(`
+        INSERT INTO customer_geography (shop, country, country_code, customer_count, total_spent, total_orders)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        shop, country, countryCode,
+        increments.customerCount ?? 0,
+        increments.totalSpent ?? 0,
+        increments.totalOrders ?? 0
+      ).run();
+    }
+  }
+
+  /**
+   * Set customer geography data (for reconciliation - replaces existing)
+   */
+  async setCustomerGeography(
+    shop: string,
+    country: string,
+    countryCode: string | null,
+    data: { customerCount: number; totalSpent: number; totalOrders: number }
+  ): Promise<void> {
+    await this.db.prepare(`
+      INSERT OR REPLACE INTO customer_geography (shop, country, country_code, customer_count, total_spent, total_orders)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      shop, country, countryCode,
+      data.customerCount,
+      data.totalSpent,
+      data.totalOrders
+    ).run();
+  }
+
+  /**
+   * Get all customer geography data for a shop
+   */
+  async getCustomerGeography(shop: string): Promise<CustomerGeography[]> {
+    const result = await this.db.prepare(
+      'SELECT * FROM customer_geography WHERE shop = ? ORDER BY customer_count DESC'
+    ).bind(shop).all<CustomerGeography>();
+    return result.results || [];
+  }
+
+  /**
+   * Clear customer geography for a shop (for reconciliation)
+   */
+  async clearCustomerGeography(shop: string): Promise<void> {
+    await this.db.prepare('DELETE FROM customer_geography WHERE shop = ?').bind(shop).run();
   }
 
   // ============ Aggregation Helpers ============

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, ShopifyOrder, ShopifyRefund } from '../types';
+import { Env, ShopifyOrder, ShopifyRefund, ShopifyCustomerFull } from '../types';
 import { MetricsService } from '../services/metrics-service';
 import crypto from 'crypto';
 
@@ -347,6 +347,95 @@ webhooks.post('/refunds/create', async (c) => {
 
   } catch (error) {
     console.error('[Webhook] Error processing refunds/create:', error);
+    return c.json({ error: 'Processing failed' }, 500);
+  }
+});
+
+/**
+ * POST /webhooks/customers/create
+ * Handle new customer creation - update geography metrics
+ */
+webhooks.post('/customers/create', async (c) => {
+  const shop = getShopFromHeaders(c);
+  const webhookId = getWebhookId(c);
+  const rawBody = await c.req.text();
+  
+  // Verify webhook signature
+  const signature = c.req.header('X-Shopify-Hmac-Sha256');
+  const isValid = await verifyWebhookSignature(rawBody, signature, c.env.SHOPIFY_API_SECRET);
+  
+  if (!isValid) {
+    console.error('[Webhook] Invalid signature for customers/create');
+    return c.json({ error: 'Invalid signature' }, 401);
+  }
+
+  try {
+    const metricsService = new MetricsService(c.env);
+    
+    // Check for duplicate webhook
+    if (await metricsService.isWebhookProcessed(shop, webhookId)) {
+      console.log(`[Webhook] Duplicate webhook ${webhookId}, skipping`);
+      return c.json({ status: 'already_processed' });
+    }
+
+    const customer: ShopifyCustomerFull = JSON.parse(rawBody);
+    console.log(`[Webhook] Processing new customer ${customer.id} for shop ${shop}`);
+
+    // Get country from default address
+    const country = customer.default_address?.country || 'Unknown';
+    const countryCode = customer.default_address?.country_code || null;
+
+    // Update customer geography
+    await metricsService.upsertCustomerGeography(shop, country, countryCode, {
+      customerCount: 1,
+      totalSpent: parseFloat(customer.total_spent) || 0,
+      totalOrders: customer.orders_count || 0,
+    });
+
+    // Mark webhook as processed
+    await metricsService.markWebhookProcessed(shop, webhookId, 'customers/create');
+
+    console.log(`[Webhook] Successfully processed new customer ${customer.id}`);
+    return c.json({ status: 'processed' });
+
+  } catch (error) {
+    console.error('[Webhook] Error processing customers/create:', error);
+    return c.json({ error: 'Processing failed' }, 500);
+  }
+});
+
+/**
+ * POST /webhooks/customers/update
+ * Handle customer updates - update geography if address changed
+ */
+webhooks.post('/customers/update', async (c) => {
+  const shop = getShopFromHeaders(c);
+  const webhookId = getWebhookId(c);
+  const rawBody = await c.req.text();
+  
+  // Verify webhook signature
+  const signature = c.req.header('X-Shopify-Hmac-Sha256');
+  const isValid = await verifyWebhookSignature(rawBody, signature, c.env.SHOPIFY_API_SECRET);
+  
+  if (!isValid) {
+    console.error('[Webhook] Invalid signature for customers/update');
+    return c.json({ error: 'Invalid signature' }, 401);
+  }
+
+  try {
+    const metricsService = new MetricsService(c.env);
+    
+    const customer: ShopifyCustomerFull = JSON.parse(rawBody);
+    console.log(`[Webhook] Customer ${customer.id} updated for shop ${shop}`);
+
+    // Note: For updates, we just acknowledge. Full geography reconciliation 
+    // would require tracking the previous address, which is complex.
+    // Running reconciliation will rebuild the accurate totals.
+    
+    return c.json({ status: 'acknowledged' });
+
+  } catch (error) {
+    console.error('[Webhook] Error processing customers/update:', error);
     return c.json({ error: 'Processing failed' }, 500);
   }
 });
