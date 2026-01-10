@@ -230,3 +230,18 @@ CREATE INDEX IF NOT EXISTS idx_order_breakdown_shop_date ON daily_order_breakdow
 CREATE INDEX IF NOT EXISTS idx_customer_geography_shop ON customer_geography(shop);
 CREATE INDEX IF NOT EXISTS idx_refund_details_shop_date ON refund_details(shop, date);
 CREATE INDEX IF NOT EXISTS idx_cancellation_details_shop_date ON cancellation_details(shop, date);
+
+-- Feedback/Query system
+CREATE TABLE IF NOT EXISTS feedback (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shop TEXT NOT NULL,
+  query TEXT NOT NULL,
+  reply TEXT,
+  status TEXT DEFAULT 'pending', -- 'pending' or 'replied'
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  replied_at TEXT,
+  UNIQUE(shop, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_shop ON feedback(shop);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(shop, status);

@@ -16,6 +16,7 @@ import OrdersReportContent from "./reportContent/OrderReportContent";
 import ProductReportContent from "./reportContent/ProductReportContent";
 import CustomerReportContent from "./reportContent/CustomerReportContent";
 import SalesInsightsContent from "./reportContent/SalesInsightsContent";
+import FeedbackContent from "./reportContent/FeedbackContent";
 import { useAuthenticatedFetch } from "../hooks/useAuthenticatedFetch";
 
 export default function Home() {
@@ -57,6 +58,12 @@ export default function Home() {
         accessibilityLabel: 'Products Reports',
         panelID: 'products-report-content',
       },
+      {
+        id: 'Feedback',
+        content: '💬 Feedback',
+        accessibilityLabel: 'Feedback and Support',
+        panelID: 'feedback-content',
+      },
     ];
 
     // Render tab content with key to force remount on tab change
@@ -70,6 +77,8 @@ export default function Home() {
           return <CustomerReportContent key="customers-report" />;
         case 3:
           return <ProductReportContent key="products-report" />;
+        case 4:
+          return <FeedbackContent key="feedback" />;
         default:
           return <SalesInsightsContent key="sales-insights" />;
       }

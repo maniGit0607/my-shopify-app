@@ -5,6 +5,7 @@ import auth from './routes/auth';
 import api from './routes/api';
 import webhooks from './routes/webhooks';
 import insights from './routes/insights';
+import feedback from './routes/feedback';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -27,6 +28,7 @@ app.get('/', (c) => {
       events: '/insights/events',
       summary: '/insights/summary',
       webhooks: '/webhooks/*',
+      feedback: '/feedback/*',
     },
   });
 });
@@ -36,6 +38,7 @@ app.route('/auth', auth);
 app.route('/api', api);
 app.route('/webhooks', webhooks);
 app.route('/insights', insights);
+app.route('/feedback', feedback);
 
 // 404 handler
 app.notFound((c) => {

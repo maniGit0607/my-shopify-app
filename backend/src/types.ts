@@ -6,6 +6,7 @@ export interface Env {
   FRONTEND_URL: string;
   SHOP_TOKENS: KVNamespace;
   ANALYTICS_DB: D1Database;
+  ADMIN_KEY?: string; // Optional admin key for feedback management
 }
 
 export interface ShopTokenData {
