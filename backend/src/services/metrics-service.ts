@@ -3,9 +3,14 @@ import {
   DailyMetrics, 
   DailyProductMetrics, 
   DailyCustomerMetrics,
+  HourlyOrderMetrics,
+  CustomerLifetime,
+  RefundDetails,
+  CancellationDetails,
   ShopEvent,
   PeriodMetrics,
   ProductPeriodMetrics,
+  CustomerValueMetrics,
   OrderBreakdownType,
   DailyOrderBreakdown,
   AggregatedOrderBreakdown,
@@ -66,6 +71,13 @@ export class MetricsService {
           refund_count = ?,
           cancelled_orders = ?,
           cancelled_revenue = ?,
+          paid_orders = ?,
+          pending_orders = ?,
+          refunded_orders = ?,
+          partially_refunded_orders = ?,
+          fulfilled_orders = ?,
+          unfulfilled_orders = ?,
+          partially_fulfilled_orders = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE shop = ? AND date = ?
       `).bind(
@@ -81,6 +93,13 @@ export class MetricsService {
         metrics.refund_count ?? existing.refund_count,
         metrics.cancelled_orders ?? existing.cancelled_orders,
         metrics.cancelled_revenue ?? existing.cancelled_revenue,
+        metrics.paid_orders ?? existing.paid_orders ?? 0,
+        metrics.pending_orders ?? existing.pending_orders ?? 0,
+        metrics.refunded_orders ?? existing.refunded_orders ?? 0,
+        metrics.partially_refunded_orders ?? existing.partially_refunded_orders ?? 0,
+        metrics.fulfilled_orders ?? existing.fulfilled_orders ?? 0,
+        metrics.unfulfilled_orders ?? existing.unfulfilled_orders ?? 0,
+        metrics.partially_fulfilled_orders ?? existing.partially_fulfilled_orders ?? 0,
         metrics.shop,
         metrics.date
       ).run();
@@ -91,8 +110,10 @@ export class MetricsService {
           shop, date, total_revenue, total_orders, average_order_value,
           new_customer_orders, returning_customer_orders, total_items_sold,
           total_discounts, orders_with_discount, total_refunds, refund_count,
-          cancelled_orders, cancelled_revenue
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          cancelled_orders, cancelled_revenue, paid_orders, pending_orders,
+          refunded_orders, partially_refunded_orders, fulfilled_orders,
+          unfulfilled_orders, partially_fulfilled_orders
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         metrics.shop,
         metrics.date,
@@ -107,7 +128,14 @@ export class MetricsService {
         metrics.total_refunds ?? 0,
         metrics.refund_count ?? 0,
         metrics.cancelled_orders ?? 0,
-        metrics.cancelled_revenue ?? 0
+        metrics.cancelled_revenue ?? 0,
+        metrics.paid_orders ?? 0,
+        metrics.pending_orders ?? 0,
+        metrics.refunded_orders ?? 0,
+        metrics.partially_refunded_orders ?? 0,
+        metrics.fulfilled_orders ?? 0,
+        metrics.unfulfilled_orders ?? 0,
+        metrics.partially_fulfilled_orders ?? 0
       ).run();
     }
   }
@@ -130,6 +158,13 @@ export class MetricsService {
       refundCount?: number;
       cancelledOrders?: number;
       cancelledRevenue?: number;
+      paidOrders?: number;
+      pendingOrders?: number;
+      refundedOrders?: number;
+      partiallyRefundedOrders?: number;
+      fulfilledOrders?: number;
+      unfulfilledOrders?: number;
+      partiallyFulfilledOrders?: number;
     }
   ): Promise<void> {
     // First ensure the record exists
@@ -187,6 +222,34 @@ export class MetricsService {
       updates.push('cancelled_revenue = cancelled_revenue + ?');
       values.push(increments.cancelledRevenue);
     }
+    if (increments.paidOrders !== undefined) {
+      updates.push('paid_orders = paid_orders + ?');
+      values.push(increments.paidOrders);
+    }
+    if (increments.pendingOrders !== undefined) {
+      updates.push('pending_orders = pending_orders + ?');
+      values.push(increments.pendingOrders);
+    }
+    if (increments.refundedOrders !== undefined) {
+      updates.push('refunded_orders = refunded_orders + ?');
+      values.push(increments.refundedOrders);
+    }
+    if (increments.partiallyRefundedOrders !== undefined) {
+      updates.push('partially_refunded_orders = partially_refunded_orders + ?');
+      values.push(increments.partiallyRefundedOrders);
+    }
+    if (increments.fulfilledOrders !== undefined) {
+      updates.push('fulfilled_orders = fulfilled_orders + ?');
+      values.push(increments.fulfilledOrders);
+    }
+    if (increments.unfulfilledOrders !== undefined) {
+      updates.push('unfulfilled_orders = unfulfilled_orders + ?');
+      values.push(increments.unfulfilledOrders);
+    }
+    if (increments.partiallyFulfilledOrders !== undefined) {
+      updates.push('partially_fulfilled_orders = partially_fulfilled_orders + ?');
+      values.push(increments.partiallyFulfilledOrders);
+    }
 
     if (updates.length > 0) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
@@ -215,6 +278,205 @@ export class MetricsService {
     `).bind(shop, date).run();
   }
 
+  // ============ Hourly Metrics CRUD ============
+
+  /**
+   * Get hourly metrics for a date range
+   */
+  async getHourlyMetricsRange(shop: string, startDate: string, endDate: string): Promise<HourlyOrderMetrics[]> {
+    const result = await this.db.prepare(
+      'SELECT * FROM hourly_order_metrics WHERE shop = ? AND date >= ? AND date <= ? ORDER BY date ASC, hour ASC'
+    ).bind(shop, startDate, endDate).all<HourlyOrderMetrics>();
+    return result.results || [];
+  }
+
+  /**
+   * Get aggregated hourly metrics across all dates
+   */
+  async getAggregatedHourlyMetrics(shop: string, startDate: string, endDate: string): Promise<{ hour: number; order_count: number; revenue: number; items_sold: number }[]> {
+    const result = await this.db.prepare(`
+      SELECT 
+        hour,
+        SUM(order_count) as order_count,
+        SUM(revenue) as revenue,
+        SUM(items_sold) as items_sold
+      FROM hourly_order_metrics 
+      WHERE shop = ? AND date >= ? AND date <= ?
+      GROUP BY hour
+      ORDER BY hour ASC
+    `).bind(shop, startDate, endDate).all();
+    return result.results as any[] || [];
+  }
+
+  /**
+   * Increment hourly metrics
+   */
+  async incrementHourlyMetrics(
+    shop: string,
+    date: string,
+    hour: number,
+    increments: { orderCount?: number; revenue?: number; itemsSold?: number }
+  ): Promise<void> {
+    const existing = await this.db.prepare(
+      'SELECT * FROM hourly_order_metrics WHERE shop = ? AND date = ? AND hour = ?'
+    ).bind(shop, date, hour).first();
+
+    if (existing) {
+      await this.db.prepare(`
+        UPDATE hourly_order_metrics SET
+          order_count = order_count + ?,
+          revenue = revenue + ?,
+          items_sold = items_sold + ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE shop = ? AND date = ? AND hour = ?
+      `).bind(
+        increments.orderCount ?? 0,
+        increments.revenue ?? 0,
+        increments.itemsSold ?? 0,
+        shop, date, hour
+      ).run();
+    } else {
+      await this.db.prepare(`
+        INSERT INTO hourly_order_metrics (shop, date, hour, order_count, revenue, items_sold)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        shop, date, hour,
+        increments.orderCount ?? 0,
+        increments.revenue ?? 0,
+        increments.itemsSold ?? 0
+      ).run();
+    }
+  }
+
+  // ============ Customer Lifetime CRUD ============
+
+  /**
+   * Get customer lifetime data
+   */
+  async getCustomerLifetime(shop: string, customerId: string): Promise<CustomerLifetime | null> {
+    const result = await this.db.prepare(
+      'SELECT * FROM customer_lifetime WHERE shop = ? AND customer_id = ?'
+    ).bind(shop, customerId).first<CustomerLifetime>();
+    return result;
+  }
+
+  /**
+   * Get all customer lifetime data for a shop
+   */
+  async getAllCustomerLifetime(shop: string, limit: number = 100, orderBy: 'total_spent' | 'total_orders' = 'total_spent'): Promise<CustomerLifetime[]> {
+    const result = await this.db.prepare(
+      `SELECT * FROM customer_lifetime WHERE shop = ? ORDER BY ${orderBy} DESC LIMIT ?`
+    ).bind(shop, limit).all<CustomerLifetime>();
+    return result.results || [];
+  }
+
+  /**
+   * Get customer value statistics
+   */
+  async getCustomerValueStats(shop: string): Promise<{
+    totalCustomers: number;
+    repeatCustomers: number;
+    oneTimeCustomers: number;
+    avgLifetimeValue: number;
+    totalRevenue: number;
+    avgOrdersPerCustomer: number;
+  }> {
+    const result = await this.db.prepare(`
+      SELECT 
+        COUNT(*) as total_customers,
+        SUM(CASE WHEN is_repeat_customer = 1 THEN 1 ELSE 0 END) as repeat_customers,
+        SUM(CASE WHEN is_repeat_customer = 0 THEN 1 ELSE 0 END) as one_time_customers,
+        AVG(total_spent) as avg_lifetime_value,
+        SUM(total_spent) as total_revenue,
+        AVG(total_orders) as avg_orders_per_customer
+      FROM customer_lifetime WHERE shop = ?
+    `).bind(shop).first<any>();
+    
+    return {
+      totalCustomers: result?.total_customers || 0,
+      repeatCustomers: result?.repeat_customers || 0,
+      oneTimeCustomers: result?.one_time_customers || 0,
+      avgLifetimeValue: result?.avg_lifetime_value || 0,
+      totalRevenue: result?.total_revenue || 0,
+      avgOrdersPerCustomer: result?.avg_orders_per_customer || 0,
+    };
+  }
+
+  /**
+   * Upsert customer lifetime data
+   */
+  async upsertCustomerLifetime(
+    shop: string,
+    customerId: string,
+    data: {
+      email?: string;
+      orderDate: string;
+      orderAmount: number;
+      refundAmount?: number;
+    }
+  ): Promise<void> {
+    const existing = await this.getCustomerLifetime(shop, customerId);
+
+    if (existing) {
+      const newTotalOrders = existing.total_orders + 1;
+      const newTotalSpent = existing.total_spent + data.orderAmount;
+      const newTotalRefunded = existing.total_refunded + (data.refundAmount || 0);
+      
+      await this.db.prepare(`
+        UPDATE customer_lifetime SET
+          email = COALESCE(?, email),
+          last_order_date = ?,
+          total_orders = ?,
+          total_spent = ?,
+          total_refunded = ?,
+          average_order_value = ?,
+          is_repeat_customer = CASE WHEN ? > 1 THEN 1 ELSE 0 END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE shop = ? AND customer_id = ?
+      `).bind(
+        data.email,
+        data.orderDate,
+        newTotalOrders,
+        newTotalSpent,
+        newTotalRefunded,
+        newTotalSpent / newTotalOrders,
+        newTotalOrders,
+        shop,
+        customerId
+      ).run();
+    } else {
+      await this.db.prepare(`
+        INSERT INTO customer_lifetime (
+          shop, customer_id, email, first_order_date, last_order_date,
+          total_orders, total_spent, total_refunded, average_order_value, is_repeat_customer
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        shop,
+        customerId,
+        data.email || null,
+        data.orderDate,
+        data.orderDate,
+        1,
+        data.orderAmount,
+        data.refundAmount || 0,
+        data.orderAmount,
+        0 // First order, not repeat yet
+      ).run();
+    }
+  }
+
+  /**
+   * Add refund to customer lifetime
+   */
+  async addCustomerRefund(shop: string, customerId: string, refundAmount: number): Promise<void> {
+    await this.db.prepare(`
+      UPDATE customer_lifetime SET
+        total_refunded = total_refunded + ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE shop = ? AND customer_id = ?
+    `).bind(refundAmount, shop, customerId).run();
+  }
+
   // ============ Product Metrics CRUD ============
 
   /**
@@ -236,13 +498,58 @@ export class MetricsService {
         product_id as productId,
         product_title as productTitle,
         SUM(revenue) as revenue,
-        SUM(units_sold) as unitsSold
+        SUM(units_sold) as unitsSold,
+        SUM(units_refunded) as unitsRefunded,
+        SUM(refund_amount) as refundAmount
       FROM daily_product_metrics 
       WHERE shop = ? AND date >= ? AND date <= ?
       GROUP BY product_id, product_title
       ORDER BY revenue DESC
     `).bind(shop, startDate, endDate).all<ProductPeriodMetrics>();
+    
+    return (result.results || []).map(p => ({
+      ...p,
+      netRevenue: p.revenue - (p.refundAmount || 0),
+      refundRate: p.unitsSold > 0 ? ((p.unitsRefunded || 0) / p.unitsSold) * 100 : 0,
+    }));
+  }
+
+  /**
+   * Get product performance trends (daily data for each product)
+   */
+  async getProductTrends(shop: string, productId: string, startDate: string, endDate: string): Promise<DailyProductMetrics[]> {
+    const result = await this.db.prepare(`
+      SELECT * FROM daily_product_metrics 
+      WHERE shop = ? AND product_id = ? AND date >= ? AND date <= ?
+      ORDER BY date ASC
+    `).bind(shop, productId, startDate, endDate).all<DailyProductMetrics>();
     return result.results || [];
+  }
+
+  /**
+   * Get products with high refund rates
+   */
+  async getHighRefundProducts(shop: string, startDate: string, endDate: string, minRefundRate: number = 10): Promise<ProductPeriodMetrics[]> {
+    const products = await this.getAggregatedProductMetrics(shop, startDate, endDate);
+    return products.filter(p => (p.refundRate || 0) >= minRefundRate);
+  }
+
+  /**
+   * Get all products ever sold (for lifecycle analysis)
+   */
+  async getAllProductsEverSold(shop: string): Promise<{ productId: string; productTitle: string; lastSaleDate: string; totalUnitsSold: number }[]> {
+    const result = await this.db.prepare(`
+      SELECT 
+        product_id as productId,
+        product_title as productTitle,
+        MAX(date) as lastSaleDate,
+        SUM(units_sold) as totalUnitsSold
+      FROM daily_product_metrics 
+      WHERE shop = ?
+      GROUP BY product_id, product_title
+      ORDER BY lastSaleDate DESC
+    `).bind(shop).all();
+    return result.results as any[] || [];
   }
 
   /**
@@ -255,7 +562,7 @@ export class MetricsService {
     productTitle: string,
     variantId: string,
     variantTitle: string,
-    increments: { unitsSold?: number; revenue?: number; discountAmount?: number }
+    increments: { unitsSold?: number; revenue?: number; discountAmount?: number; unitsRefunded?: number; refundAmount?: number }
   ): Promise<void> {
     // Check if exists
     const existing = await this.db.prepare(
@@ -268,25 +575,31 @@ export class MetricsService {
           units_sold = units_sold + ?,
           revenue = revenue + ?,
           discount_amount = discount_amount + ?,
+          units_refunded = units_refunded + ?,
+          refund_amount = refund_amount + ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE shop = ? AND date = ? AND product_id = ? AND variant_id = ?
       `).bind(
         increments.unitsSold ?? 0,
         increments.revenue ?? 0,
         increments.discountAmount ?? 0,
+        increments.unitsRefunded ?? 0,
+        increments.refundAmount ?? 0,
         shop, date, productId, variantId
       ).run();
     } else {
       await this.db.prepare(`
         INSERT INTO daily_product_metrics (
           shop, date, product_id, product_title, variant_id, variant_title,
-          units_sold, revenue, discount_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          units_sold, revenue, discount_amount, units_refunded, refund_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         shop, date, productId, productTitle, variantId, variantTitle,
         increments.unitsSold ?? 0,
         increments.revenue ?? 0,
-        increments.discountAmount ?? 0
+        increments.discountAmount ?? 0,
+        increments.unitsRefunded ?? 0,
+        increments.refundAmount ?? 0
       ).run();
     }
   }
@@ -301,6 +614,30 @@ export class MetricsService {
       'SELECT * FROM daily_customer_metrics WHERE shop = ? AND date >= ? AND date <= ? ORDER BY date ASC'
     ).bind(shop, startDate, endDate).all<DailyCustomerMetrics>();
     return result.results || [];
+  }
+
+  /**
+   * Get aggregated customer growth metrics
+   */
+  async getCustomerGrowthMetrics(shop: string, startDate: string, endDate: string): Promise<{
+    totalNew: number;
+    totalReturning: number;
+    dailyBreakdown: { date: string; new_customers: number; returning_customers: number }[];
+  }> {
+    const daily = await this.getCustomerMetricsRange(shop, startDate, endDate);
+    
+    const totalNew = daily.reduce((sum, d) => sum + d.new_customers, 0);
+    const totalReturning = daily.reduce((sum, d) => sum + d.returning_customers, 0);
+    
+    return {
+      totalNew,
+      totalReturning,
+      dailyBreakdown: daily.map(d => ({
+        date: d.date,
+        new_customers: d.new_customers,
+        returning_customers: d.returning_customers,
+      })),
+    };
   }
 
   /**
@@ -340,6 +677,79 @@ export class MetricsService {
         (increments.newCustomers ?? 0) + (increments.returningCustomers ?? 0)
       ).run();
     }
+  }
+
+  // ============ Refund Details CRUD ============
+
+  /**
+   * Record refund details
+   */
+  async recordRefundDetails(refund: Omit<RefundDetails, 'id' | 'created_at'>): Promise<void> {
+    await this.db.prepare(`
+      INSERT OR REPLACE INTO refund_details (shop, date, refund_id, order_id, amount, reason, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      refund.shop,
+      refund.date,
+      refund.refund_id,
+      refund.order_id,
+      refund.amount,
+      refund.reason || null,
+      refund.note || null
+    ).run();
+  }
+
+  /**
+   * Get refunds by reason
+   */
+  async getRefundsByReason(shop: string, startDate: string, endDate: string): Promise<{ reason: string; count: number; amount: number }[]> {
+    const result = await this.db.prepare(`
+      SELECT 
+        COALESCE(reason, 'unspecified') as reason,
+        COUNT(*) as count,
+        SUM(amount) as amount
+      FROM refund_details 
+      WHERE shop = ? AND date >= ? AND date <= ?
+      GROUP BY reason
+      ORDER BY amount DESC
+    `).bind(shop, startDate, endDate).all();
+    return result.results as any[] || [];
+  }
+
+  // ============ Cancellation Details CRUD ============
+
+  /**
+   * Record cancellation details
+   */
+  async recordCancellationDetails(cancellation: Omit<CancellationDetails, 'id' | 'created_at'>): Promise<void> {
+    await this.db.prepare(`
+      INSERT OR REPLACE INTO cancellation_details (shop, date, cancellation_date, order_id, amount, reason)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      cancellation.shop,
+      cancellation.date,
+      cancellation.cancellation_date,
+      cancellation.order_id,
+      cancellation.amount,
+      cancellation.reason || null
+    ).run();
+  }
+
+  /**
+   * Get cancellations by reason
+   */
+  async getCancellationsByReason(shop: string, startDate: string, endDate: string): Promise<{ reason: string; count: number; amount: number }[]> {
+    const result = await this.db.prepare(`
+      SELECT 
+        COALESCE(reason, 'unspecified') as reason,
+        COUNT(*) as count,
+        SUM(amount) as amount
+      FROM cancellation_details 
+      WHERE shop = ? AND date >= ? AND date <= ?
+      GROUP BY reason
+      ORDER BY amount DESC
+    `).bind(shop, startDate, endDate).all();
+    return result.results as any[] || [];
   }
 
   // ============ Shop Events CRUD ============
@@ -555,6 +965,13 @@ export class MetricsService {
       refundCount: acc.refundCount + day.refund_count,
       cancelledOrders: acc.cancelledOrders + day.cancelled_orders,
       cancelledRevenue: acc.cancelledRevenue + day.cancelled_revenue,
+      paidOrders: acc.paidOrders + (day.paid_orders || 0),
+      pendingOrders: acc.pendingOrders + (day.pending_orders || 0),
+      refundedOrders: acc.refundedOrders + (day.refunded_orders || 0),
+      partiallyRefundedOrders: acc.partiallyRefundedOrders + (day.partially_refunded_orders || 0),
+      fulfilledOrders: acc.fulfilledOrders + (day.fulfilled_orders || 0),
+      unfulfilledOrders: acc.unfulfilledOrders + (day.unfulfilled_orders || 0),
+      partiallyFulfilledOrders: acc.partiallyFulfilledOrders + (day.partially_fulfilled_orders || 0),
     }), {
       grossRevenue: 0,
       orders: 0,
@@ -568,6 +985,13 @@ export class MetricsService {
       refundCount: 0,
       cancelledOrders: 0,
       cancelledRevenue: 0,
+      paidOrders: 0,
+      pendingOrders: 0,
+      refundedOrders: 0,
+      partiallyRefundedOrders: 0,
+      fulfilledOrders: 0,
+      unfulfilledOrders: 0,
+      partiallyFulfilledOrders: 0,
     });
 
     // Calculate NET revenue: gross - cancelled - refunds
@@ -587,6 +1011,13 @@ export class MetricsService {
       refundCount: aggregated.refundCount,
       cancelledOrders: aggregated.cancelledOrders,
       cancelledRevenue: aggregated.cancelledRevenue,
+      paidOrders: aggregated.paidOrders,
+      pendingOrders: aggregated.pendingOrders,
+      refundedOrders: aggregated.refundedOrders,
+      partiallyRefundedOrders: aggregated.partiallyRefundedOrders,
+      fulfilledOrders: aggregated.fulfilledOrders,
+      unfulfilledOrders: aggregated.unfulfilledOrders,
+      partiallyFulfilledOrders: aggregated.partiallyFulfilledOrders,
     } as PeriodMetrics;
   }
 
@@ -600,4 +1031,3 @@ export class MetricsService {
     };
   }
 }
-

@@ -52,6 +52,7 @@ interface ShopifyOrderEdge {
     name: string;
     createdAt: string;
     cancelledAt: string | null;
+    cancelReason: string | null;
     displayFinancialStatus: string;
     displayFulfillmentStatus: string | null;
     totalPriceSet: {
@@ -65,8 +66,14 @@ interface ShopifyOrderEdge {
         amount: string;
       };
     };
+    totalRefundedSet: {
+      shopMoney: {
+        amount: string;
+      };
+    };
     customer: {
       id: string;
+      email: string;
       numberOfOrders: number;
     } | null;
     lineItems: {
@@ -95,6 +102,29 @@ interface ShopifyOrderEdge {
         };
       }[];
     };
+    refunds: {
+      id: string;
+      createdAt: string;
+      note: string | null;
+      refundLineItems: {
+        edges: {
+          node: {
+            lineItem: {
+              id: string;
+              product: {
+                id: string;
+              } | null;
+            };
+            quantity: number;
+            subtotalSet: {
+              shopMoney: {
+                amount: string;
+              };
+            };
+          };
+        }[];
+      };
+    }[];
     sourceName: string | null;
     paymentGatewayNames: string[];
   };
@@ -263,6 +293,10 @@ export class ReconciliationService {
     await db.prepare('DELETE FROM daily_product_metrics WHERE shop = ?').bind(shop).run();
     await db.prepare('DELETE FROM daily_customer_metrics WHERE shop = ?').bind(shop).run();
     await db.prepare('DELETE FROM daily_order_breakdown WHERE shop = ?').bind(shop).run();
+    await db.prepare('DELETE FROM hourly_order_metrics WHERE shop = ?').bind(shop).run();
+    await db.prepare('DELETE FROM customer_lifetime WHERE shop = ?').bind(shop).run();
+    await db.prepare('DELETE FROM refund_details WHERE shop = ?').bind(shop).run();
+    await db.prepare('DELETE FROM cancellation_details WHERE shop = ?').bind(shop).run();
     await db.prepare('DELETE FROM shop_events WHERE shop = ?').bind(shop).run();
     await db.prepare('DELETE FROM customer_geography WHERE shop = ?').bind(shop).run();
     
@@ -287,6 +321,7 @@ export class ReconciliationService {
               name
               createdAt
               cancelledAt
+              cancelReason
               displayFinancialStatus
               displayFulfillmentStatus
               totalPriceSet {
@@ -300,8 +335,14 @@ export class ReconciliationService {
                   amount
                 }
               }
+              totalRefundedSet {
+                shopMoney {
+                  amount
+                }
+              }
               customer {
                 id
+                email
                 numberOfOrders
               }
               lineItems(first: 50) {
@@ -326,6 +367,29 @@ export class ReconciliationService {
                     variant {
                       id
                       title
+                    }
+                  }
+                }
+              }
+              refunds {
+                id
+                createdAt
+                note
+                refundLineItems(first: 50) {
+                  edges {
+                    node {
+                      lineItem {
+                        id
+                        product {
+                          id
+                        }
+                      }
+                      quantity
+                      subtotalSet {
+                        shopMoney {
+                          amount
+                        }
+                      }
                     }
                   }
                 }
@@ -371,9 +435,11 @@ export class ReconciliationService {
    */
   private async processOrder(shop: string, order: ShopifyOrderEdge['node']): Promise<void> {
     const date = order.createdAt.split('T')[0];
+    const hour = new Date(order.createdAt).getHours();
     const revenue = parseFloat(order.totalPriceSet.shopMoney.amount);
     const discounts = parseFloat(order.totalDiscountsSet.shopMoney.amount);
     const hasDiscount = discounts > 0;
+    const totalRefunded = parseFloat(order.totalRefundedSet?.shopMoney?.amount || '0');
     
     // Calculate items sold
     const itemsSold = order.lineItems.edges.reduce(
@@ -389,6 +455,19 @@ export class ReconciliationService {
     // Check if order was cancelled
     const isCancelled = order.cancelledAt !== null;
 
+    // Parse financial status
+    const financialStatus = order.displayFinancialStatus?.toLowerCase() || 'pending';
+    const isPaid = financialStatus === 'paid' || financialStatus === 'partially_paid';
+    const isPending = financialStatus === 'pending' || financialStatus === 'authorized';
+    const isRefunded = financialStatus === 'refunded';
+    const isPartiallyRefunded = financialStatus === 'partially_refunded';
+
+    // Parse fulfillment status
+    const fulfillmentStatus = order.displayFulfillmentStatus?.toLowerCase() || 'unfulfilled';
+    const isFulfilled = fulfillmentStatus === 'fulfilled';
+    const isUnfulfilled = fulfillmentStatus === 'unfulfilled' || fulfillmentStatus === null;
+    const isPartiallyFulfilled = fulfillmentStatus === 'partially_fulfilled' || fulfillmentStatus === 'partial';
+
     // Update daily metrics
     // Always add to gross revenue (even if cancelled) - net revenue is calculated as:
     // net = gross - cancelledRevenue - refunds
@@ -401,7 +480,25 @@ export class ReconciliationService {
       discounts,
       ordersWithDiscount: hasDiscount ? 1 : 0,
       cancelledOrders: isCancelled ? 1 : 0,
-      cancelledRevenue: isCancelled ? revenue : 0,  // Track separately for net calculation
+      cancelledRevenue: isCancelled ? revenue : 0,
+      refunds: totalRefunded,
+      refundCount: order.refunds?.length || 0,
+      // Financial status
+      paidOrders: isPaid && !isCancelled ? 1 : 0,
+      pendingOrders: isPending && !isCancelled ? 1 : 0,
+      refundedOrders: isRefunded ? 1 : 0,
+      partiallyRefundedOrders: isPartiallyRefunded ? 1 : 0,
+      // Fulfillment status
+      fulfilledOrders: isFulfilled && !isCancelled ? 1 : 0,
+      unfulfilledOrders: isUnfulfilled && !isCancelled ? 1 : 0,
+      partiallyFulfilledOrders: isPartiallyFulfilled && !isCancelled ? 1 : 0,
+    });
+
+    // Update hourly metrics
+    await this.metricsService.incrementHourlyMetrics(shop, date, hour, {
+      orderCount: 1,
+      revenue,
+      itemsSold,
     });
 
     // Update product metrics
@@ -425,11 +522,81 @@ export class ReconciliationService {
       );
     }
 
+    // Process refunds and update product refund metrics
+    if (order.refunds && order.refunds.length > 0) {
+      for (const refund of order.refunds) {
+        const refundDate = refund.createdAt.split('T')[0];
+        const refundId = refund.id.split('/').pop() || refund.id;
+        const orderId = order.id.split('/').pop() || order.id;
+        
+        // Calculate refund amount from line items
+        let refundAmount = 0;
+        for (const refundLineItem of refund.refundLineItems?.edges || []) {
+          const rli = refundLineItem.node;
+          refundAmount += parseFloat(rli.subtotalSet?.shopMoney?.amount || '0');
+          
+          // Update product refund metrics
+          const productId = rli.lineItem?.product?.id?.split('/').pop() || 'unknown';
+          if (productId !== 'unknown') {
+            await this.metricsService.incrementProductMetrics(
+              shop,
+              date, // Use order date for product metrics
+              productId,
+              '', // Title not available in refund
+              'default',
+              'Default',
+              {
+                unitsRefunded: rli.quantity,
+                refundAmount: parseFloat(rli.subtotalSet?.shopMoney?.amount || '0'),
+              }
+            );
+          }
+        }
+
+        // Record refund details
+        await this.metricsService.recordRefundDetails({
+          shop,
+          date: refundDate,
+          refund_id: refundId,
+          order_id: orderId,
+          amount: refundAmount,
+          reason: undefined, // Reason not in basic refund data
+          note: refund.note || undefined,
+        });
+      }
+    }
+
+    // Record cancellation details if cancelled
+    if (isCancelled && order.cancelledAt) {
+      const cancellationDate = order.cancelledAt.split('T')[0];
+      const orderId = order.id.split('/').pop() || order.id;
+      
+      await this.metricsService.recordCancellationDetails({
+        shop,
+        date, // Order creation date
+        cancellation_date: cancellationDate,
+        order_id: orderId,
+        amount: revenue,
+        reason: order.cancelReason || undefined,
+      });
+    }
+
     // Update customer metrics
     await this.metricsService.incrementCustomerMetrics(shop, date, {
       newCustomers: isNewCustomer ? 1 : 0,
       returningCustomers: isNewCustomer ? 0 : 1,
     });
+
+    // Update customer lifetime value
+    if (order.customer) {
+      const customerId = order.customer.id.split('/').pop() || order.customer.id;
+      await this.metricsService.upsertCustomerLifetime(shop, customerId, {
+        email: order.customer.email,
+        orderDate: date,
+        orderAmount: revenue,
+        refundAmount: totalRefunded,
+      });
+    }
 
     // Update order breakdown metrics
     // Channel breakdown
@@ -446,9 +613,14 @@ export class ReconciliationService {
       revenue,
     });
 
-    // Status breakdown
-    const status = order.displayFulfillmentStatus || 'UNFULFILLED';
-    await this.metricsService.incrementOrderBreakdown(shop, date, 'status', status.toLowerCase(), {
+    // Fulfillment status breakdown
+    await this.metricsService.incrementOrderBreakdown(shop, date, 'fulfillment_status', fulfillmentStatus, {
+      orderCount: 1,
+      revenue,
+    });
+
+    // Financial status breakdown
+    await this.metricsService.incrementOrderBreakdown(shop, date, 'financial_status', financialStatus, {
       orderCount: 1,
       revenue,
     });
@@ -535,4 +707,3 @@ export class ReconciliationService {
     });
   }
 }
-

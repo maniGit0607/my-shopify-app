@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { Env, ShopifyOrder, ShopifyRefund, ShopifyCustomerFull } from '../types';
 import { MetricsService } from '../services/metrics-service';
-import crypto from 'crypto';
 
 const webhooks = new Hono<{ Bindings: Env }>();
 
@@ -56,6 +55,13 @@ function extractDate(isoTimestamp: string): string {
 }
 
 /**
+ * Extract hour (0-23) from ISO timestamp
+ */
+function extractHour(isoTimestamp: string): number {
+  return new Date(isoTimestamp).getHours();
+}
+
+/**
  * POST /webhooks/orders/create
  * Handle new order creation
  */
@@ -84,6 +90,7 @@ webhooks.post('/orders/create', async (c) => {
 
     const order: ShopifyOrder = JSON.parse(rawBody);
     const date = extractDate(order.created_at);
+    const hour = extractHour(order.created_at);
     
     console.log(`[Webhook] Processing order ${order.id} for shop ${shop} on ${date}`);
 
@@ -96,6 +103,17 @@ webhooks.post('/orders/create', async (c) => {
     const hasDiscount = discounts > 0;
     const itemsSold = order.line_items.reduce((sum, item) => sum + item.quantity, 0);
 
+    // Parse financial status
+    const financialStatus = order.financial_status?.toLowerCase() || 'pending';
+    const isPaid = financialStatus === 'paid' || financialStatus === 'partially_paid';
+    const isPending = financialStatus === 'pending' || financialStatus === 'authorized';
+
+    // Parse fulfillment status
+    const fulfillmentStatus = order.fulfillment_status?.toLowerCase() || 'unfulfilled';
+    const isFulfilled = fulfillmentStatus === 'fulfilled';
+    const isUnfulfilled = fulfillmentStatus === null || fulfillmentStatus === 'unfulfilled';
+    const isPartiallyFulfilled = fulfillmentStatus === 'partial';
+
     // Update daily metrics
     await metricsService.incrementDailyMetrics(shop, date, {
       revenue,
@@ -105,6 +123,20 @@ webhooks.post('/orders/create', async (c) => {
       itemsSold,
       discounts,
       ordersWithDiscount: hasDiscount ? 1 : 0,
+      // Financial status
+      paidOrders: isPaid ? 1 : 0,
+      pendingOrders: isPending ? 1 : 0,
+      // Fulfillment status
+      fulfilledOrders: isFulfilled ? 1 : 0,
+      unfulfilledOrders: isUnfulfilled ? 1 : 0,
+      partiallyFulfilledOrders: isPartiallyFulfilled ? 1 : 0,
+    });
+
+    // Update hourly metrics
+    await metricsService.incrementHourlyMetrics(shop, date, hour, {
+      orderCount: 1,
+      revenue,
+      itemsSold,
     });
 
     // Update product metrics
@@ -130,6 +162,15 @@ webhooks.post('/orders/create', async (c) => {
       returningCustomers: isNewCustomer ? 0 : 1,
     });
 
+    // Update customer lifetime value
+    if (order.customer) {
+      await metricsService.upsertCustomerLifetime(shop, String(order.customer.id), {
+        email: order.customer.email,
+        orderDate: date,
+        orderAmount: revenue,
+      });
+    }
+
     // Update order breakdown metrics
     // Channel breakdown
     const channel = order.source_name || 'unknown';
@@ -145,9 +186,14 @@ webhooks.post('/orders/create', async (c) => {
       revenue,
     });
 
-    // Status breakdown (initial status is typically unfulfilled)
-    const status = order.fulfillment_status || 'unfulfilled';
-    await metricsService.incrementOrderBreakdown(shop, date, 'status', status, {
+    // Fulfillment status breakdown
+    await metricsService.incrementOrderBreakdown(shop, date, 'fulfillment_status', fulfillmentStatus || 'unfulfilled', {
+      orderCount: 1,
+      revenue,
+    });
+
+    // Financial status breakdown
+    await metricsService.incrementOrderBreakdown(shop, date, 'financial_status', financialStatus, {
       orderCount: 1,
       revenue,
     });
@@ -220,6 +266,62 @@ webhooks.post('/orders/updated', async (c) => {
 });
 
 /**
+ * POST /webhooks/orders/paid
+ * Handle order payment confirmation
+ */
+webhooks.post('/orders/paid', async (c) => {
+  const shop = getShopFromHeaders(c);
+  const webhookId = getWebhookId(c);
+  const rawBody = await c.req.text();
+  
+  // Verify webhook signature
+  const signature = c.req.header('X-Shopify-Hmac-Sha256');
+  const isValid = await verifyWebhookSignature(rawBody, signature, c.env.SHOPIFY_API_SECRET);
+  
+  if (!isValid) {
+    console.error('[Webhook] Invalid signature for orders/paid');
+    return c.json({ error: 'Invalid signature' }, 401);
+  }
+
+  try {
+    const metricsService = new MetricsService(c.env);
+    
+    // Check for duplicate webhook
+    if (await metricsService.isWebhookProcessed(shop, webhookId)) {
+      console.log(`[Webhook] Duplicate webhook ${webhookId}, skipping`);
+      return c.json({ status: 'already_processed' });
+    }
+
+    const order: ShopifyOrder = JSON.parse(rawBody);
+    const date = extractDate(order.created_at);
+    
+    console.log(`[Webhook] Order ${order.id} paid for shop ${shop}`);
+
+    // Update financial status - move from pending to paid
+    // Note: This is incremental tracking, reconciliation provides accurate totals
+    await metricsService.incrementDailyMetrics(shop, date, {
+      paidOrders: 1,
+      pendingOrders: -1, // Decrement pending since it's now paid
+    });
+
+    // Update breakdown
+    await metricsService.incrementOrderBreakdown(shop, date, 'financial_status', 'paid', {
+      orderCount: 1,
+      revenue: parseFloat(order.total_price),
+    });
+
+    // Mark webhook as processed
+    await metricsService.markWebhookProcessed(shop, webhookId, 'orders/paid');
+
+    return c.json({ status: 'processed' });
+
+  } catch (error) {
+    console.error('[Webhook] Error processing orders/paid:', error);
+    return c.json({ error: 'Processing failed' }, 500);
+  }
+});
+
+/**
  * POST /webhooks/orders/cancelled
  * Handle order cancellations
  */
@@ -260,15 +362,30 @@ webhooks.post('/orders/cancelled', async (c) => {
       cancelledRevenue: revenue,
     });
 
-    // Log the cancellation event (use cancellation date for the event log)
+    // Record cancellation details
     const cancellationDate = order.cancelled_at ? extractDate(order.cancelled_at) : date;
+    await metricsService.recordCancellationDetails({
+      shop,
+      date, // Order creation date
+      cancellation_date: cancellationDate,
+      order_id: String(order.id),
+      amount: revenue,
+      reason: order.cancel_reason || undefined,
+    });
+
+    // Log the cancellation event (use cancellation date for the event log)
     await metricsService.logEvent({
       shop,
       date: cancellationDate,
       event_type: 'order_cancelled',
       description: `Order #${order.order_number} cancelled ($${revenue.toFixed(2)}) - originally placed ${date}`,
       impact_amount: -revenue,
-      metadata: JSON.stringify({ order_id: order.id, order_number: order.order_number, original_date: date }),
+      metadata: JSON.stringify({ 
+        order_id: order.id, 
+        order_number: order.order_number, 
+        original_date: date,
+        reason: order.cancel_reason 
+      }),
     });
 
     // Mark webhook as processed
@@ -279,6 +396,55 @@ webhooks.post('/orders/cancelled', async (c) => {
 
   } catch (error) {
     console.error('[Webhook] Error processing orders/cancelled:', error);
+    return c.json({ error: 'Processing failed' }, 500);
+  }
+});
+
+/**
+ * POST /webhooks/orders/fulfilled
+ * Handle order fulfillment
+ */
+webhooks.post('/orders/fulfilled', async (c) => {
+  const shop = getShopFromHeaders(c);
+  const webhookId = getWebhookId(c);
+  const rawBody = await c.req.text();
+  
+  // Verify webhook signature
+  const signature = c.req.header('X-Shopify-Hmac-Sha256');
+  const isValid = await verifyWebhookSignature(rawBody, signature, c.env.SHOPIFY_API_SECRET);
+  
+  if (!isValid) {
+    console.error('[Webhook] Invalid signature for orders/fulfilled');
+    return c.json({ error: 'Invalid signature' }, 401);
+  }
+
+  try {
+    const metricsService = new MetricsService(c.env);
+    
+    // Check for duplicate webhook
+    if (await metricsService.isWebhookProcessed(shop, webhookId)) {
+      console.log(`[Webhook] Duplicate webhook ${webhookId}, skipping`);
+      return c.json({ status: 'already_processed' });
+    }
+
+    const order: ShopifyOrder = JSON.parse(rawBody);
+    const date = extractDate(order.created_at);
+    
+    console.log(`[Webhook] Order ${order.id} fulfilled for shop ${shop}`);
+
+    // Update fulfillment status
+    await metricsService.incrementDailyMetrics(shop, date, {
+      fulfilledOrders: 1,
+      unfulfilledOrders: -1, // Decrement unfulfilled
+    });
+
+    // Mark webhook as processed
+    await metricsService.markWebhookProcessed(shop, webhookId, 'orders/fulfilled');
+
+    return c.json({ status: 'processed' });
+
+  } catch (error) {
+    console.error('[Webhook] Error processing orders/fulfilled:', error);
     return c.json({ error: 'Processing failed' }, 500);
   }
 });
@@ -326,6 +492,35 @@ webhooks.post('/refunds/create', async (c) => {
       refunds: refundAmount,
       refundCount: 1,
     });
+
+    // Record refund details
+    await metricsService.recordRefundDetails({
+      shop,
+      date,
+      refund_id: String(refund.id),
+      order_id: String(refund.order_id),
+      amount: refundAmount,
+      note: undefined,
+    });
+
+    // Update product refund metrics
+    for (const refundLineItem of refund.refund_line_items || []) {
+      const productId = refundLineItem.line_item?.product_id;
+      if (productId) {
+        await metricsService.incrementProductMetrics(
+          shop,
+          date,
+          String(productId),
+          refundLineItem.line_item.title,
+          String(refundLineItem.line_item.variant_id),
+          refundLineItem.line_item.variant_title || 'Default',
+          {
+            unitsRefunded: refundLineItem.quantity,
+            refundAmount: parseFloat(refundLineItem.subtotal),
+          }
+        );
+      }
+    }
 
     // Log significant refunds
     if (refundAmount > 100) {
@@ -441,4 +636,3 @@ webhooks.post('/customers/update', async (c) => {
 });
 
 export default webhooks;
-

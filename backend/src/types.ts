@@ -50,6 +50,15 @@ export interface DailyMetrics {
   refund_count: number;
   cancelled_orders: number;
   cancelled_revenue: number;
+  // Financial status
+  paid_orders: number;
+  pending_orders: number;
+  refunded_orders: number;
+  partially_refunded_orders: number;
+  // Fulfillment status
+  fulfilled_orders: number;
+  unfulfilled_orders: number;
+  partially_fulfilled_orders: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -65,6 +74,8 @@ export interface DailyProductMetrics {
   units_sold: number;
   revenue: number;
   discount_amount: number;
+  units_refunded: number;
+  refund_amount: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -80,6 +91,57 @@ export interface DailyCustomerMetrics {
   updated_at?: string;
 }
 
+export interface HourlyOrderMetrics {
+  id?: number;
+  shop: string;
+  date: string;
+  hour: number;
+  order_count: number;
+  revenue: number;
+  items_sold: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomerLifetime {
+  id?: number;
+  shop: string;
+  customer_id: string;
+  email?: string;
+  first_order_date?: string;
+  last_order_date?: string;
+  total_orders: number;
+  total_spent: number;
+  total_refunded: number;
+  average_order_value: number;
+  is_repeat_customer: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RefundDetails {
+  id?: number;
+  shop: string;
+  date: string;
+  refund_id: string;
+  order_id: string;
+  amount: number;
+  reason?: string;
+  note?: string;
+  created_at?: string;
+}
+
+export interface CancellationDetails {
+  id?: number;
+  shop: string;
+  date: string;
+  cancellation_date: string;
+  order_id: string;
+  amount: number;
+  reason?: string;
+  created_at?: string;
+}
+
 export interface ShopEvent {
   id?: number;
   shop: string;
@@ -91,7 +153,7 @@ export interface ShopEvent {
   created_at?: string;
 }
 
-export type OrderBreakdownType = 'channel' | 'payment_method' | 'status' | 'discount';
+export type OrderBreakdownType = 'channel' | 'payment_method' | 'fulfillment_status' | 'financial_status' | 'discount';
 
 export interface DailyOrderBreakdown {
   id?: number;
@@ -151,6 +213,7 @@ export interface ShopifyOrder {
   created_at: string;
   updated_at: string;
   cancelled_at: string | null;
+  cancel_reason: string | null;
   financial_status: string;
   fulfillment_status: string | null;
   name: string;
@@ -205,8 +268,10 @@ export interface ShopifyRefund {
   id: number;
   created_at: string;
   order_id: number;
+  note?: string;
   refund_line_items: {
     line_item_id: number;
+    line_item: ShopifyLineItem;
     quantity: number;
     subtotal: string;
   }[];
@@ -241,6 +306,15 @@ export interface PeriodMetrics {
   refundCount: number;
   cancelledOrders: number;
   cancelledRevenue: number;
+  // Financial status
+  paidOrders: number;
+  pendingOrders: number;
+  refundedOrders: number;
+  partiallyRefundedOrders: number;
+  // Fulfillment status
+  fulfilledOrders: number;
+  unfulfilledOrders: number;
+  partiallyFulfilledOrders: number;
 }
 
 export interface ProductPeriodMetrics {
@@ -248,6 +322,38 @@ export interface ProductPeriodMetrics {
   productTitle: string;
   revenue: number;
   unitsSold: number;
+  unitsRefunded?: number;
+  refundAmount?: number;
+  netRevenue?: number;
+  refundRate?: number;
+}
+
+export interface CustomerValueMetrics {
+  customerId: string;
+  email?: string;
+  totalOrders: number;
+  totalSpent: number;
+  totalRefunded: number;
+  netSpent: number;
+  averageOrderValue: number;
+  firstOrderDate?: string;
+  lastOrderDate?: string;
+  isRepeatCustomer: boolean;
+}
+
+export interface HourlyTrendData {
+  hour: number;
+  orderCount: number;
+  revenue: number;
+  avgItems: number;
+}
+
+export interface DailyTrendData {
+  date: string;
+  dayOfWeek: string;
+  orderCount: number;
+  revenue: number;
+  avgOrderValue: number;
 }
 
 export interface AnalyticsReport {
@@ -270,4 +376,90 @@ export interface AnalyticsReport {
   };
 }
 
+// ============ Report Response Types ============
 
+export interface SalesRevenueReport {
+  period: { start: string; end: string };
+  grossSales: number;
+  netSales: number;
+  totalRevenue: number;
+  averageOrderValue: number;
+  ordersCount: number;
+  revenueGrowth: {
+    weekOverWeek: number;
+    monthOverMonth: number;
+    yearOverYear: number;
+  };
+  dailyBreakdown: DailyTrendData[];
+}
+
+export interface RefundsCancellationsReport {
+  period: { start: string; end: string };
+  totalRefundedAmount: number;
+  refundRate: number;
+  refundCount: number;
+  cancelledOrdersCount: number;
+  cancelledRevenue: number;
+  cancellationRate: number;
+  refundsByReason: { reason: string; count: number; amount: number }[];
+  cancellationsByReason: { reason: string; count: number; amount: number }[];
+  dailyTrend: { date: string; refunds: number; cancellations: number }[];
+}
+
+export interface OrderStatusReport {
+  period: { start: string; end: string };
+  financialStatus: {
+    paid: { count: number; revenue: number };
+    pending: { count: number; revenue: number };
+    refunded: { count: number; revenue: number };
+    partiallyRefunded: { count: number; revenue: number };
+  };
+  fulfillmentStatus: {
+    fulfilled: { count: number; revenue: number };
+    unfulfilled: { count: number; revenue: number };
+    partiallyFulfilled: { count: number; revenue: number };
+  };
+}
+
+export interface OrderTrendsReport {
+  period: { start: string; end: string };
+  dailyTrends: DailyTrendData[];
+  hourlyHeatmap: HourlyTrendData[];
+  weekdayVsWeekend: {
+    weekday: { avgOrders: number; avgRevenue: number };
+    weekend: { avgOrders: number; avgRevenue: number };
+  };
+  peakHour: number;
+  peakDay: string;
+}
+
+export interface ProductLifecycleReport {
+  period: { start: string; end: string };
+  neverSold: { productId: string; productTitle: string }[];
+  decliningProducts: ProductPeriodMetrics[];
+  highRefundProducts: ProductPeriodMetrics[];
+  topPerformers: ProductPeriodMetrics[];
+}
+
+export interface CustomerGrowthReport {
+  period: { start: string; end: string };
+  newCustomersPerDay: { date: string; count: number }[];
+  totalNewCustomers: number;
+  totalReturningCustomers: number;
+  growthRate: number;
+}
+
+export interface CustomerValueReport {
+  lifetimeValue: {
+    average: number;
+    median: number;
+    total: number;
+  };
+  averageSpendPerCustomer: number;
+  topCustomers: CustomerValueMetrics[];
+  oneTimeVsLoyal: {
+    oneTime: { count: number; revenue: number };
+    loyal: { count: number; revenue: number };
+  };
+  repeatPurchaseRate: number;
+}
