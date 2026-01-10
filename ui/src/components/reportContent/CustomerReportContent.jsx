@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Select,
   InlineStack,
@@ -39,6 +39,7 @@ export default function CustomerReportContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [reportData, setReportData] = useState(null);
+  const [fetchCounter, setFetchCounter] = useState(0);
 
   const today = new Date();
   const [dateRange, setDateRange] = useState({
@@ -55,50 +56,69 @@ export default function CustomerReportContent() {
 
   const handleReportChange = (value) => {
     setSelectedReport(value);
+    setFetchCounter(c => c + 1);
   };
 
   const handleDateRangeChange = (newDateRange) => {
     setDateRange(newDateRange);
+    setFetchCounter(c => c + 1);
   };
 
-  const fetchReportData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const startDate = new Date(dateRange.start).toISOString().split('T')[0];
-      const endDate = new Date(dateRange.end).toISOString().split('T')[0];
-
-      let data;
-      switch (selectedReport) {
-        case 'customerGrowth':
-          data = await getCustomerGrowth({ startDate, endDate });
-          break;
-        case 'repeatVsNew':
-          data = await getCustomerRepeat({ startDate, endDate });
-          break;
-        case 'customerValue':
-          data = await getCustomerValue({ limit: 25 });
-          break;
-        case 'customerGeography':
-          data = await getCustomerGeography();
-          break;
-        default:
-          data = await getCustomerGrowth({ startDate, endDate });
-      }
-
-      setReportData(data);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch report data');
-      console.error('Error fetching customer report:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [dateRange, selectedReport, getCustomerGrowth, getCustomerRepeat, getCustomerValue, getCustomerGeography]);
+  // Convert dates to ISO strings for stable comparison
+  const startDateStr = dateRange.start instanceof Date 
+    ? dateRange.start.toISOString().split('T')[0] 
+    : new Date(dateRange.start).toISOString().split('T')[0];
+  const endDateStr = dateRange.end instanceof Date 
+    ? dateRange.end.toISOString().split('T')[0] 
+    : new Date(dateRange.end).toISOString().split('T')[0];
 
   useEffect(() => {
-    fetchReportData();
-  }, [fetchReportData]);
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        let data;
+        switch (selectedReport) {
+          case 'customerGrowth':
+            data = await getCustomerGrowth({ startDate: startDateStr, endDate: endDateStr });
+            break;
+          case 'repeatVsNew':
+            data = await getCustomerRepeat({ startDate: startDateStr, endDate: endDateStr });
+            break;
+          case 'customerValue':
+            data = await getCustomerValue({ limit: 25 });
+            break;
+          case 'customerGeography':
+            data = await getCustomerGeography();
+            break;
+          default:
+            data = await getCustomerGrowth({ startDate: startDateStr, endDate: endDateStr });
+        }
+
+        if (isMounted) {
+          setReportData(data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message || 'Failed to fetch report data');
+          console.error('Error fetching customer report:', err);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [startDateStr, endDateStr, selectedReport, fetchCounter, getCustomerGrowth, getCustomerRepeat, getCustomerValue, getCustomerGeography]);
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {

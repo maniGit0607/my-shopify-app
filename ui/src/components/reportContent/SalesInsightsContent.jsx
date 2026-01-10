@@ -377,32 +377,51 @@ export default function SalesInsightsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [report, setReport] = useState(null);
+  const [fetchCounter, setFetchCounter] = useState(0); // Force re-fetch trigger
   
   const { getReport } = useInsightsFetch();
 
-  // Fetch report when period changes
-  const fetchReport = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const data = await getReport({ period, compare: true });
-      setReport(data);
-    } catch (err) {
-      console.error('Failed to fetch report:', err);
-      setError(err.message || 'Failed to load insights');
-    } finally {
-      setLoading(false);
-    }
-  }, [getReport, period]);
-
+  // Fetch report when period or counter changes
   useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const data = await getReport({ period, compare: true });
+        if (isMounted) {
+          setReport(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch report:', err);
+        if (isMounted) {
+          setError(err.message || 'Failed to load insights');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [period, fetchCounter, getReport]);
 
   // Handle period change
   const handlePeriodChange = useCallback((value) => {
     setPeriod(value);
+    setFetchCounter(c => c + 1);
+  }, []);
+
+  // Manual refresh function for retry button
+  const handleRetry = useCallback(() => {
+    setFetchCounter(c => c + 1);
   }, []);
 
   // Render loading state
@@ -424,7 +443,7 @@ export default function SalesInsightsContent() {
         <Banner
           title="Failed to load insights"
           tone="critical"
-          action={{ content: 'Retry', onAction: fetchReport }}
+          action={{ content: 'Retry', onAction: handleRetry }}
         >
           <p>{error}</p>
           <p style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>

@@ -39,6 +39,7 @@ export default function OrdersReportContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [reportData, setReportData] = useState(null);
+  const [fetchCounter, setFetchCounter] = useState(0); // Force re-fetch trigger
 
   const today = new Date();
   const [dateRange, setDateRange] = useState({
@@ -55,13 +56,23 @@ export default function OrdersReportContent() {
 
   const handleReportChange = (value) => {
     setSelectedReport(value);
+    setFetchCounter(c => c + 1); // Trigger re-fetch
   };
 
   const handleDateRangeChange = (newDateRange) => {
     setDateRange(newDateRange);
+    setFetchCounter(c => c + 1); // Trigger re-fetch
   };
 
-  // Fetch report data when report type or date range changes
+  // Convert dates to ISO strings for stable comparison
+  const startDateStr = dateRange.start instanceof Date 
+    ? dateRange.start.toISOString().split('T')[0] 
+    : new Date(dateRange.start).toISOString().split('T')[0];
+  const endDateStr = dateRange.end instanceof Date 
+    ? dateRange.end.toISOString().split('T')[0] 
+    : new Date(dateRange.end).toISOString().split('T')[0];
+
+  // Fetch report data when report type, date range, or counter changes
   useEffect(() => {
     let isMounted = true;
     
@@ -70,25 +81,22 @@ export default function OrdersReportContent() {
       setError(null);
 
       try {
-        const startDate = new Date(dateRange.start).toISOString().split('T')[0];
-        const endDate = new Date(dateRange.end).toISOString().split('T')[0];
-
         let data;
         switch (selectedReport) {
           case 'salesRevenue':
-            data = await getSalesRevenue({ startDate, endDate });
+            data = await getSalesRevenue({ startDate: startDateStr, endDate: endDateStr });
             break;
           case 'refundsCancellations':
-            data = await getRefundsCancellations({ startDate, endDate });
+            data = await getRefundsCancellations({ startDate: startDateStr, endDate: endDateStr });
             break;
           case 'orderStatus':
-            data = await getOrderStatus({ startDate, endDate });
+            data = await getOrderStatus({ startDate: startDateStr, endDate: endDateStr });
             break;
           case 'orderTrends':
-            data = await getOrderTrends({ startDate, endDate });
+            data = await getOrderTrends({ startDate: startDateStr, endDate: endDateStr });
             break;
           default:
-            data = await getSalesRevenue({ startDate, endDate });
+            data = await getSalesRevenue({ startDate: startDateStr, endDate: endDateStr });
         }
 
         if (isMounted) {
@@ -111,7 +119,7 @@ export default function OrdersReportContent() {
     return () => {
       isMounted = false;
     };
-  }, [dateRange.start, dateRange.end, selectedReport, getSalesRevenue, getRefundsCancellations, getOrderStatus, getOrderTrends]);
+  }, [startDateStr, endDateStr, selectedReport, fetchCounter, getSalesRevenue, getRefundsCancellations, getOrderStatus, getOrderTrends]);
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -349,7 +357,7 @@ export default function OrdersReportContent() {
   const renderOrderStatusReport = () => {
     if (!reportData) return null;
 
-    const { totalOrders, totalRevenue, financialBreakdown, fulfillmentBreakdown } = reportData;
+    const { totalOrders, totalRevenue, financialBreakdown, fulfillmentBreakdown, paymentMethodBreakdown, countryBreakdown } = reportData;
 
     const financialData = financialBreakdown?.map(item => ({
       name: item.status,
@@ -360,6 +368,20 @@ export default function OrdersReportContent() {
 
     const fulfillmentData = fulfillmentBreakdown?.map(item => ({
       name: item.status,
+      value: item.count,
+      revenue: item.revenue,
+      percentage: item.percentage,
+    })) || [];
+
+    const paymentData = paymentMethodBreakdown?.map(item => ({
+      name: item.name,
+      value: item.count,
+      revenue: item.revenue,
+      percentage: item.percentage,
+    })) || [];
+
+    const countryData = countryBreakdown?.map(item => ({
+      name: item.name,
       value: item.count,
       revenue: item.revenue,
       percentage: item.percentage,
@@ -377,6 +399,47 @@ export default function OrdersReportContent() {
         </text>
       );
     };
+
+    // Helper to render a pie chart card
+    const renderPieChartCard = (title, data) => (
+      <Card>
+        <BlockStack gap="300">
+          <Text variant="headingMd">{title}</Text>
+          {data.length > 0 ? (
+            <>
+              <div style={{ height: '250px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={data} cx="50%" cy="50%" labelLine={false} label={renderCustomLabel} outerRadius={90} fill="#8884d8" dataKey="value">
+                      {data.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [value, name]} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <BlockStack gap="100">
+                {data.slice(0, 5).map((item, i) => (
+                  <InlineStack key={i} align="space-between">
+                    <Text variant="bodySm">{item.name}</Text>
+                    <Text variant="bodySm">{item.value} ({formatCurrency(item.revenue)})</Text>
+                  </InlineStack>
+                ))}
+                {data.length > 5 && (
+                  <Text variant="bodySm" tone="subdued">+{data.length - 5} more...</Text>
+                )}
+              </BlockStack>
+            </>
+          ) : (
+            <Box padding="400">
+              <Text tone="subdued" alignment="center">No data available</Text>
+            </Box>
+          )}
+        </BlockStack>
+      </Card>
+    );
 
     return (
       <BlockStack gap="400">
@@ -396,63 +459,16 @@ export default function OrdersReportContent() {
           </Card>
         </div>
 
-        {/* Charts */}
+        {/* Row 1: Financial & Fulfillment Status */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-          {/* Financial Status */}
-          <Card>
-            <BlockStack gap="300">
-              <Text variant="headingMd">Financial Status</Text>
-              <div style={{ height: '300px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={financialData} cx="50%" cy="50%" labelLine={false} label={renderCustomLabel} outerRadius={100} fill="#8884d8" dataKey="value">
-                      {financialData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [value, name]} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <BlockStack gap="100">
-                {financialData.map((item, i) => (
-                  <InlineStack key={i} align="space-between">
-                    <Text variant="bodySm">{item.name}</Text>
-                    <Text variant="bodySm">{item.value} orders ({formatCurrency(item.revenue)})</Text>
-                  </InlineStack>
-                ))}
-              </BlockStack>
-            </BlockStack>
-          </Card>
+          {renderPieChartCard('Financial Status', financialData)}
+          {renderPieChartCard('Fulfillment Status', fulfillmentData)}
+        </div>
 
-          {/* Fulfillment Status */}
-          <Card>
-            <BlockStack gap="300">
-              <Text variant="headingMd">Fulfillment Status</Text>
-              <div style={{ height: '300px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={fulfillmentData} cx="50%" cy="50%" labelLine={false} label={renderCustomLabel} outerRadius={100} fill="#8884d8" dataKey="value">
-                      {fulfillmentData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [value, name]} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <BlockStack gap="100">
-                {fulfillmentData.map((item, i) => (
-                  <InlineStack key={i} align="space-between">
-                    <Text variant="bodySm">{item.name}</Text>
-                    <Text variant="bodySm">{item.value} orders ({formatCurrency(item.revenue)})</Text>
-                  </InlineStack>
-                ))}
-              </BlockStack>
-            </BlockStack>
-          </Card>
+        {/* Row 2: Payment Method & Country */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+          {renderPieChartCard('Payment Method', paymentData)}
+          {renderPieChartCard('Orders by Country', countryData)}
         </div>
       </BlockStack>
     );

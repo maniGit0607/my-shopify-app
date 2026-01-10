@@ -297,13 +297,22 @@ insights.get('/orders/status', async (c) => {
 
     const metricsService = new MetricsService(c.env);
     
-    // Get breakdowns by status types
+    // Get breakdowns by all status types
     const financialBreakdown = await metricsService.getAggregatedOrderBreakdown(
       shop, dateRange.start, dateRange.end, 'financial_status'
     );
     const fulfillmentBreakdown = await metricsService.getAggregatedOrderBreakdown(
       shop, dateRange.start, dateRange.end, 'fulfillment_status'
     );
+    const paymentMethodBreakdown = await metricsService.getAggregatedOrderBreakdown(
+      shop, dateRange.start, dateRange.end, 'payment_method'
+    );
+    const channelBreakdown = await metricsService.getAggregatedOrderBreakdown(
+      shop, dateRange.start, dateRange.end, 'channel'
+    );
+
+    // Get customer geography for country breakdown
+    const customerGeography = await metricsService.getCustomerGeography(shop);
 
     // Format financial status
     const financialStatus: Record<string, { count: number; revenue: number }> = {};
@@ -326,6 +335,32 @@ insights.get('/orders/status', async (c) => {
     // Calculate totals
     const totalOrders = financialBreakdown.reduce((sum, item) => sum + item.order_count, 0);
     const totalRevenue = financialBreakdown.reduce((sum, item) => sum + item.revenue, 0);
+
+    // Format payment method breakdown
+    const paymentMethodData = paymentMethodBreakdown.map(item => ({
+      name: formatStatusValue(item.breakdown_value),
+      count: item.order_count,
+      revenue: item.revenue,
+      percentage: totalOrders > 0 ? (item.order_count / totalOrders) * 100 : 0,
+    }));
+
+    // Format channel breakdown
+    const channelData = channelBreakdown.map(item => ({
+      name: formatStatusValue(item.breakdown_value),
+      count: item.order_count,
+      revenue: item.revenue,
+      percentage: totalOrders > 0 ? (item.order_count / totalOrders) * 100 : 0,
+    }));
+
+    // Format country breakdown from customer geography
+    const totalCustomerOrders = customerGeography.reduce((sum, g) => sum + g.total_orders, 0);
+    const countryData = customerGeography.map(g => ({
+      name: g.country || 'Unknown',
+      code: g.country_code,
+      count: g.total_orders,
+      revenue: g.total_spent,
+      percentage: totalCustomerOrders > 0 ? (g.total_orders / totalCustomerOrders) * 100 : 0,
+    }));
 
     return c.json({
       period: dateRange,
@@ -356,6 +391,9 @@ insights.get('/orders/status', async (c) => {
         revenue: item.revenue,
         percentage: totalOrders > 0 ? (item.order_count / totalOrders) * 100 : 0,
       })),
+      paymentMethodBreakdown: paymentMethodData,
+      channelBreakdown: channelData,
+      countryBreakdown: countryData,
     });
 
   } catch (error) {

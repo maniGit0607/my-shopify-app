@@ -16,7 +16,6 @@ import OrdersReportContent from "./reportContent/OrderReportContent";
 import ProductReportContent from "./reportContent/ProductReportContent";
 import CustomerReportContent from "./reportContent/CustomerReportContent";
 import SalesInsightsContent from "./reportContent/SalesInsightsContent";
-import OrdersPieChart from "./charts/OrdersPieChart";
 import { useAuthenticatedFetch } from "../hooks/useAuthenticatedFetch";
 
 export default function Home() {
@@ -32,50 +31,49 @@ export default function Home() {
     const [reconcileResult, setReconcileResult] = useState(null);
     const [reconcileError, setReconcileError] = useState(null);
 
-    // Order filters state
-    const today = new Date();
-    const [orderFilters, setOrderFilters] = useState({
-      reportType: 'ordersByStatus',
-      dateRange: {
-        start: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30),
-        end: today,
-      },
-    });
-
-    const handleOrderFilterChange = useCallback((filters) => {
-      setOrderFilters(filters);
-    }, []);
   
     const tabs = [
       {
         id: 'Insights',
         content: '📊 Sales & Growth',
-        render: <SalesInsightsContent />,
         accessibilityLabel: 'Sales and Growth Insights',
         panelID: 'sales-insights-content',
       },
       {
         id: 'Orders',
         content: 'Orders Reports',
-        render: <OrdersReportContent onFilterChange={handleOrderFilterChange} />,
         accessibilityLabel: 'Orders Reports',
         panelID: 'orders-report-content',
       },
       {
         id: 'Customers',
         content: 'Customers Reports',
-        render: <CustomerReportContent />,
         accessibilityLabel: 'Customers Reports',
         panelID: 'customers-report-content',
       },
       {
         id: 'Products',
         content: 'Products Reports',
-        render: <ProductReportContent />,
         accessibilityLabel: 'Products Reports',
         panelID: 'products-report-content',
       },
     ];
+
+    // Render tab content with key to force remount on tab change
+    const renderTabContent = () => {
+      switch (selectedTab) {
+        case 0:
+          return <SalesInsightsContent key="sales-insights" />;
+        case 1:
+          return <OrdersReportContent key="orders-report" />;
+        case 2:
+          return <CustomerReportContent key="customers-report" />;
+        case 3:
+          return <ProductReportContent key="products-report" />;
+        default:
+          return <SalesInsightsContent key="sales-insights" />;
+      }
+    };
 
     // Reconciliation function - fetches last 3 years of orders and populates metrics
     const handleReconciliation = async () => {
@@ -165,29 +163,18 @@ export default function Home() {
 
         <Layout>
           <Layout.Section>
-            <BlockStack gap="400">
-              <Card sectioned>
-                {/* Tabs for Reports */}
-                <Tabs
-                  tabs={tabs}
-                  selected={selectedTab}
-                  onSelect={handleTabChange}
-                >
-                  <Card title={tabs[selectedTab].content}>
-                    {tabs[selectedTab].render}
-                  </Card>
-                </Tabs>
-              </Card>
-              
-              {/* Show chart card only for Order Reports */}
-              {selectedTab === 1 && (
-                <Card>
-                  <div style={{ minHeight: '400px', padding: '16px' }}>
-                    <OrdersPieChart filters={orderFilters} />
-                  </div>
+            <Card sectioned>
+              {/* Tabs for Reports */}
+              <Tabs
+                tabs={tabs}
+                selected={selectedTab}
+                onSelect={handleTabChange}
+              >
+                <Card title={tabs[selectedTab].content}>
+                  {renderTabContent()}
                 </Card>
-              )}
-            </BlockStack>
+              </Tabs>
+            </Card>
           </Layout.Section>
         </Layout>
       </Page>
