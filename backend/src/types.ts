@@ -153,7 +153,7 @@ export interface ShopEvent {
   created_at?: string;
 }
 
-export type OrderBreakdownType = 'channel' | 'payment_method' | 'fulfillment_status' | 'financial_status' | 'discount';
+export type OrderBreakdownType = 'channel' | 'payment_method' | 'fulfillment_status' | 'financial_status' | 'discount' | 'country';
 
 export interface DailyOrderBreakdown {
   id?: number;
@@ -236,6 +236,14 @@ export interface ShopifyOrder {
     };
   };
   payment_gateway_names?: string[]; // e.g., ['shopify_payments', 'paypal']
+  // Shipping address for country tracking
+  shipping_address?: {
+    country?: string;
+    country_code?: string;
+    city?: string;
+    province?: string;
+    province_code?: string;
+  };
 }
 
 export interface ShopifyCustomer {

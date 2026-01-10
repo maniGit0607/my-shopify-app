@@ -311,8 +311,10 @@ insights.get('/orders/status', async (c) => {
       shop, dateRange.start, dateRange.end, 'channel'
     );
 
-    // Get customer geography for country breakdown
-    const customerGeography = await metricsService.getCustomerGeography(shop);
+    // Get country breakdown from order shipping addresses
+    const countryBreakdown = await metricsService.getAggregatedOrderBreakdown(
+      shop, dateRange.start, dateRange.end, 'country'
+    );
 
     // Format financial status
     const financialStatus: Record<string, { count: number; revenue: number }> = {};
@@ -352,14 +354,12 @@ insights.get('/orders/status', async (c) => {
       percentage: totalOrders > 0 ? (item.order_count / totalOrders) * 100 : 0,
     }));
 
-    // Format country breakdown from customer geography
-    const totalCustomerOrders = customerGeography.reduce((sum, g) => sum + g.total_orders, 0);
-    const countryData = customerGeography.map(g => ({
-      name: g.country || 'Unknown',
-      code: g.country_code,
-      count: g.total_orders,
-      revenue: g.total_spent,
-      percentage: totalCustomerOrders > 0 ? (g.total_orders / totalCustomerOrders) * 100 : 0,
+    // Format country breakdown from order shipping addresses
+    const countryData = countryBreakdown.map(item => ({
+      name: formatStatusValue(item.breakdown_value),
+      count: item.order_count,
+      revenue: item.revenue,
+      percentage: totalOrders > 0 ? (item.order_count / totalOrders) * 100 : 0,
     }));
 
     return c.json({
@@ -1304,9 +1304,9 @@ insights.get('/orders/breakdown', async (c) => {
     const endDate = c.req.query('endDate');
 
     // Validate breakdown type
-    const validTypes: OrderBreakdownType[] = ['fulfillment_status', 'financial_status', 'channel', 'payment_method', 'discount'];
+    const validTypes: OrderBreakdownType[] = ['fulfillment_status', 'financial_status', 'channel', 'payment_method', 'discount', 'country'];
     if (!breakdownType || !validTypes.includes(breakdownType)) {
-      return c.json({ error: 'Invalid breakdown type. Must be one of: fulfillment_status, financial_status, channel, payment_method, discount' }, 400);
+      return c.json({ error: 'Invalid breakdown type. Must be one of: fulfillment_status, financial_status, channel, payment_method, discount, country' }, 400);
     }
 
     // Validate dates

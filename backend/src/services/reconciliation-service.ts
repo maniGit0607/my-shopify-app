@@ -71,6 +71,10 @@ interface ShopifyOrderEdge {
         amount: string;
       };
     };
+    shippingAddress: {
+      country: string | null;
+      countryCodeV2: string | null;
+    } | null;
     customer: {
       id: string;
       email: string;
@@ -339,6 +343,10 @@ export class ReconciliationService {
                 shopMoney {
                   amount
                 }
+              }
+              shippingAddress {
+                country
+                countryCodeV2
               }
               customer {
                 id
@@ -628,6 +636,13 @@ export class ReconciliationService {
     // Discount breakdown
     const discountStatus = hasDiscount ? 'with_discount' : 'without_discount';
     await this.metricsService.incrementOrderBreakdown(shop, date, 'discount', discountStatus, {
+      orderCount: 1,
+      revenue,
+    });
+
+    // Country breakdown (based on shipping address)
+    const shippingCountry = order.shippingAddress?.country || 'Unknown';
+    await this.metricsService.incrementOrderBreakdown(shop, date, 'country', shippingCountry, {
       orderCount: 1,
       revenue,
     });

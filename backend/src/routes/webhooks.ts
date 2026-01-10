@@ -205,6 +205,13 @@ webhooks.post('/orders/create', async (c) => {
       revenue,
     });
 
+    // Country breakdown (based on shipping address)
+    const shippingCountry = order.shipping_address?.country || 'Unknown';
+    await metricsService.incrementOrderBreakdown(shop, date, 'country', shippingCountry, {
+      orderCount: 1,
+      revenue,
+    });
+
     // Log significant events
     if (revenue > 500) {
       await metricsService.logEvent({

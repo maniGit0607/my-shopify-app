@@ -468,7 +468,7 @@ export default function OrdersReportContent() {
         {/* Row 2: Payment Method & Country */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
           {renderPieChartCard('Payment Method', paymentData)}
-          {renderPieChartCard('Orders by Country', countryData)}
+          {renderPieChartCard('Order Shipment by Country', countryData)}
         </div>
       </BlockStack>
     );
