@@ -7,7 +7,8 @@ const COLORS = ['#008060', '#5C6AC4', '#006FBB', '#47C1BF', '#FFC96B', '#DC5E63'
 
 // Map report types to breakdown API types
 const REPORT_TYPE_TO_BREAKDOWN = {
-  ordersByStatus: 'status',
+  ordersByStatus: 'financial_status',
+  ordersByFulfillment: 'fulfillment_status',
   ordersByChannel: 'channel',
   ordersByPaymentMethod: 'payment_method',
   ordersByDiscount: 'discount',
@@ -15,7 +16,8 @@ const REPORT_TYPE_TO_BREAKDOWN = {
 
 // Chart titles for each report type
 const CHART_TITLES = {
-  ordersByStatus: 'Orders by Status',
+  ordersByStatus: 'Orders by Financial Status',
+  ordersByFulfillment: 'Orders by Fulfillment Status',
   ordersByChannel: 'Orders by Channel',
   ordersByPaymentMethod: 'Orders by Payment Method',
   ordersByDiscount: 'Orders by Discount',

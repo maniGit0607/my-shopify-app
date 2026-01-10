@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Select,
   InlineStack,
@@ -61,44 +61,57 @@ export default function OrdersReportContent() {
     setDateRange(newDateRange);
   };
 
-  const fetchReportData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const startDate = new Date(dateRange.start).toISOString().split('T')[0];
-      const endDate = new Date(dateRange.end).toISOString().split('T')[0];
-
-      let data;
-      switch (selectedReport) {
-        case 'salesRevenue':
-          data = await getSalesRevenue({ startDate, endDate });
-          break;
-        case 'refundsCancellations':
-          data = await getRefundsCancellations({ startDate, endDate });
-          break;
-        case 'orderStatus':
-          data = await getOrderStatus({ startDate, endDate });
-          break;
-        case 'orderTrends':
-          data = await getOrderTrends({ startDate, endDate });
-          break;
-        default:
-          data = await getSalesRevenue({ startDate, endDate });
-      }
-
-      setReportData(data);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch report data');
-      console.error('Error fetching order report:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [dateRange, selectedReport, getSalesRevenue, getRefundsCancellations, getOrderStatus, getOrderTrends]);
-
+  // Fetch report data when report type or date range changes
   useEffect(() => {
-    fetchReportData();
-  }, [fetchReportData]);
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const startDate = new Date(dateRange.start).toISOString().split('T')[0];
+        const endDate = new Date(dateRange.end).toISOString().split('T')[0];
+
+        let data;
+        switch (selectedReport) {
+          case 'salesRevenue':
+            data = await getSalesRevenue({ startDate, endDate });
+            break;
+          case 'refundsCancellations':
+            data = await getRefundsCancellations({ startDate, endDate });
+            break;
+          case 'orderStatus':
+            data = await getOrderStatus({ startDate, endDate });
+            break;
+          case 'orderTrends':
+            data = await getOrderTrends({ startDate, endDate });
+            break;
+          default:
+            data = await getSalesRevenue({ startDate, endDate });
+        }
+
+        if (isMounted) {
+          setReportData(data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message || 'Failed to fetch report data');
+          console.error('Error fetching order report:', err);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [dateRange.start, dateRange.end, selectedReport, getSalesRevenue, getRefundsCancellations, getOrderStatus, getOrderTrends]);
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
