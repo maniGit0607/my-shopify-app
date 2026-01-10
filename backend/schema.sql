@@ -245,3 +245,24 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 CREATE INDEX IF NOT EXISTS idx_feedback_shop ON feedback(shop);
 CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(shop, status);
+
+-- Subscription/Billing system
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shop TEXT NOT NULL UNIQUE,
+  shopify_subscription_id TEXT,
+  plan_name TEXT DEFAULT 'Pro Plan',
+  price REAL DEFAULT 5.00,
+  currency TEXT DEFAULT 'USD',
+  status TEXT DEFAULT 'pending', -- 'pending', 'trial', 'active', 'cancelled', 'expired'
+  trial_starts_at TEXT,
+  trial_ends_at TEXT,
+  billing_starts_at TEXT,
+  current_period_end TEXT,
+  cancelled_at TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_shop ON subscriptions(shop);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);

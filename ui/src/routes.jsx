@@ -1,6 +1,7 @@
 import { useRoutes } from 'react-router-dom';
 // layouts
 import Home from './components/Home';
+import SubscriptionGate from './components/SubscriptionGate';
 
 // ----------------------------------------------------------------------
 
@@ -9,7 +10,14 @@ export default function RouteTeller() {
     {
       path: '',
       children: [
-        { path: '', element: <Home /> },
+        { 
+          path: '', 
+          element: (
+            <SubscriptionGate>
+              <Home />
+            </SubscriptionGate>
+          ) 
+        },
       ]
     }
   ]);
