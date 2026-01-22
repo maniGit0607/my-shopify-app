@@ -21,7 +21,6 @@ app.get('/', (c) => {
     endpoints: {
       auth: '/auth',
       callback: '/auth/callback',
-      graphql: '/api/graphql',
       health: '/api/health',
       insights: '/insights/report',
       daily: '/insights/daily',

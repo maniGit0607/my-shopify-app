@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
+import { Context } from 'hono';
 import { Env } from '../types';
-import { validateSessionToken, getShop } from '../middleware/session-token';
+import { validateSessionToken, getShop, getSessionToken } from '../middleware/session-token';
+import { TokenExchange } from '../services/token-exchange';
 
 const billing = new Hono<{ Bindings: Env }>();
 
@@ -17,13 +19,27 @@ const PLAN_CONFIG = {
 billing.use('/*', validateSessionToken);
 
 /**
- * Helper to get access token for a shop
+ * Helper to get access token via token exchange
+ * Exchanges session token for online access token on-demand
  */
-async function getAccessToken(env: Env, shop: string): Promise<string | null> {
-  const tokenData = await env.SHOP_TOKENS.get(shop);
-  if (!tokenData) return null;
-  const parsed = JSON.parse(tokenData);
-  return parsed.accessToken;
+async function getAccessToken(c: Context<{ Bindings: Env }>): Promise<string | null> {
+  const shop = getShop(c);
+  const sessionToken = getSessionToken(c);
+  
+  if (!shop || !sessionToken) {
+    console.error('[Billing] Missing shop or session token');
+    return null;
+  }
+
+  const tokenExchange = new TokenExchange(c.env);
+  const accessToken = await tokenExchange.exchangeForOnlineToken(sessionToken, shop);
+  
+  if (!accessToken) {
+    console.error('[Billing] Token exchange failed for shop:', shop);
+    return null;
+  }
+
+  return accessToken;
 }
 
 /**
@@ -195,9 +211,9 @@ billing.post('/subscribe', async (c) => {
   if (!shop) return c.json({ error: 'Shop not found' }, 401);
 
   try {
-    const accessToken = await getAccessToken(c.env, shop);
+    const accessToken = await getAccessToken(c);
     if (!accessToken) {
-      return c.json({ error: 'Access token not found' }, 401);
+      return c.json({ error: 'Token exchange failed. Please reinstall the app.' }, 401);
     }
 
     // Create subscription via Shopify Billing API
@@ -303,7 +319,7 @@ billing.get('/callback', async (c) => {
   }
 
   try {
-    const accessToken = await getAccessToken(c.env, shop);
+    const accessToken = await getAccessToken(c);
     if (!accessToken) {
       return c.redirect(`${c.env.FRONTEND_URL}?error=auth_failed`);
     }
@@ -392,9 +408,9 @@ billing.post('/cancel', async (c) => {
       return c.json({ error: 'No active subscription found' }, 404);
     }
 
-    const accessToken = await getAccessToken(c.env, shop);
+    const accessToken = await getAccessToken(c);
     if (!accessToken) {
-      return c.json({ error: 'Access token not found' }, 401);
+      return c.json({ error: 'Token exchange failed. Please reinstall the app.' }, 401);
     }
 
     // Cancel via Shopify API
